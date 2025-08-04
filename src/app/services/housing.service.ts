@@ -1,34 +1,55 @@
 import { Injectable } from "@angular/core";
-import { HousingLocation } from "../interfaces/housing-location";
+import { HousingLocation } from "../interfaces/housing-location.interface";
 import { environment } from "../../environments/environment";
 
 @Injectable({
-  providedIn: "root", // This service is provided in the root injector, making it available throughout the application
+  providedIn: "root",
 })
 export class HousingService {
-  private url = `${environment.apiUrl}/locations`; // URL to the housing locations API
+  private url = `${environment.apiUrl}/locations`;
 
   constructor() {}
 
-  // Method to get all housing locations
   async getAllHousingLocations(): Promise<HousingLocation[]> {
-    const response = await fetch(this.url);
-    return (await response.json()) ?? []; // Fetching all housing locations from the API and returning them as an array of HousingLocation objects
+    try {
+      const response = await fetch(this.url);
+      if (!response.ok) {
+        // Handles HTTP errors (e.g. 404, 500)
+        throw new Error(`Failed to fetch locations: ${response.statusText}`);
+      }
+      return (await response.json()) ?? [];
+    } catch (error) {
+      // Catches network errors or JSON parsing issues
+      console.error("Error fetching all housing locations:", error);
+      return [];
+    }
   }
 
-  // Method to get a specific housing location by its ID
   async getHousingLocationById(
     id: number
   ): Promise<HousingLocation | undefined> {
-    const data = await fetch(`${this.url}/${id}`);
-    return await data.json();
+    try {
+      const response = await fetch(`${this.url}/${id}`);
+      if (!response.ok) {
+        throw new Error(
+          `Location with ID ${id} not found: ${response.statusText}`
+        );
+      }
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching housing location with ID ${id}:`, error);
+      return undefined;
+    }
   }
 
-  // Method to submit an application
   submitApplication(firstName: string, lastName: string, email: string): void {
-    // Here you would typically send the application data to a server or handle it as needed
-    console.log(
-      `Application submitted for ${firstName} ${lastName} with email ${email}`
-    );
+    // TODO: Placeholder for future API call; currently logs submission
+    try {
+      console.log(
+        `Application submitted for ${firstName} ${lastName} with email ${email}`
+      );
+    } catch (error) {
+      console.error("Error submitting application:", error);
+    }
   }
 }
