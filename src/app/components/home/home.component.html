@@ -1,0 +1,18 @@
+<section>
+  <form>
+    <input type="text" placeholder="Filter by city" #filter />
+    <!-- The button below triggers the filterResults method with the value from the input field -->
+    <button class="primary" type="button" (click)="filterResults(filter.value)">
+      Search
+    </button>
+  </form>
+</section>
+<section class="results">
+  <!-- The housingLocationList is an array of housingLocation objects, which are displayed using the app-housing-location component.
+       Each housingLocation in the list is sent to the app-housing-location component as an input property, then
+       the *ngFor directive reads through the housingLocationList, creating an instance of app-housing-location for each item -->
+  <app-housing-location
+    *ngFor="let housingLocation of filteredLocationList"
+    [housingLocation]="housingLocation"
+  ></app-housing-location>
+</section>
