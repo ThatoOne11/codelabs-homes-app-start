@@ -11,7 +11,7 @@ const mockHousingData: HousingLocation[] = [
     city: "Chicago",
     state: "IL",
     photo: "",
-    availableUnits: 4,
+    available_units: 4,
     wifi: true,
     laundry: true,
   },
@@ -21,7 +21,7 @@ const mockHousingData: HousingLocation[] = [
     city: "Oakland",
     state: "CA",
     photo: "",
-    availableUnits: 2,
+    available_units: 2,
     wifi: true,
     laundry: true,
   },
@@ -31,7 +31,7 @@ const mockHousingData: HousingLocation[] = [
     city: "Chicago",
     state: "IL",
     photo: "",
-    availableUnits: 1,
+    available_units: 1,
     wifi: true,
     laundry: false,
   },
@@ -67,27 +67,33 @@ describe("HomeComponent", () => {
     expect(component).toBeTruthy();
   });
 
-  it("should load housing locations on init", waitForAsync(() => {
-    // Waits until all async operations finish
-    fixture.whenStable().then(() => {
-      // After init, both lists should be filled with mock data
-      expect(component.originalHousingLocationList.length).toBe(3);
-      expect(component.filteredHousingLocationList.length).toBe(3);
-    });
-  }));
+  it(
+    "should load housing locations on init",
+    waitForAsync(() => {
+      // Waits until all async operations finish
+      fixture.whenStable().then(() => {
+        // After init, both lists should be filled with mock data
+        expect(component.originalHousingLocationList.length).toBe(3);
+        expect(component.filteredHousingLocationList.length).toBe(3);
+      });
+    }),
+  );
 
-  it("should filter results based on search text", waitForAsync(() => {
-    fixture.whenStable().then(() => {
-      // Simulates user searching for a city and checks filtered results
-      component.filterResults("Chicago");
-      expect(component.filteredHousingLocationList.length).toBe(2);
+  it(
+    "should filter results based on search text",
+    waitForAsync(() => {
+      fixture.whenStable().then(() => {
+        // Simulates user searching for a city and checks filtered results
+        component.filterResults("Chicago");
+        expect(component.filteredHousingLocationList.length).toBe(2);
 
-      component.filterResults("Oakland");
-      expect(component.filteredHousingLocationList.length).toBe(1);
+        component.filterResults("Oakland");
+        expect(component.filteredHousingLocationList.length).toBe(1);
 
-      // Empty search should reset the filter
-      component.filterResults("");
-      expect(component.filteredHousingLocationList.length).toBe(3);
-    });
-  }));
+        // Empty search should reset the filter
+        component.filterResults("");
+        expect(component.filteredHousingLocationList.length).toBe(3);
+      });
+    }),
+  );
 });

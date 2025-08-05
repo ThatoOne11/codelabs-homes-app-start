@@ -12,7 +12,7 @@ describe("HousingService", () => {
       city: "Cape Town",
       state: "WC",
       photo: "",
-      availableUnits: 2,
+      available_units: 2,
       wifi: true,
       laundry: true,
     },
@@ -22,7 +22,7 @@ describe("HousingService", () => {
       city: "Joburg",
       state: "GP",
       photo: "",
-      availableUnits: 3,
+      available_units: 3,
       wifi: false,
       laundry: false,
     },
@@ -46,7 +46,7 @@ describe("HousingService", () => {
         new Response(JSON.stringify(mockHousingList), {
           status: 200,
           statusText: "OK",
-        })
+        }),
       );
 
       const result = await service.getAllHousingLocations();
@@ -72,7 +72,7 @@ describe("HousingService", () => {
         new Response(JSON.stringify(mockLocation), {
           status: 200,
           statusText: "OK",
-        })
+        }),
       );
 
       const result = await service.getHousingLocationById(1);
@@ -97,7 +97,7 @@ describe("HousingService", () => {
       service.submitApplication("Jane", "Doe", "jane@example.com");
 
       expect(console.log).toHaveBeenCalledWith(
-        "Application submitted for Jane Doe with email jane@example.com"
+        "Application submitted for Jane Doe with email jane@example.com",
       );
     });
 
@@ -111,7 +111,7 @@ describe("HousingService", () => {
       // Check if our service catches the error and logs it
       expect(console.error).toHaveBeenCalledWith(
         "Error submitting application:",
-        jasmine.any(Error)
+        jasmine.any(Error),
       );
     });
   });

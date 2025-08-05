@@ -1,0 +1,62 @@
+/* src/app/housing-location/housing-location.component.css */
+
+.listing {
+  background-color: var(--accent-color);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease-in-out;
+}
+.listing:hover {
+  transform: translateY(-4px);
+}
+
+.listing-heading {
+  color: var(--primary-color);
+  padding: 16px 24px 8px;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.listing-photo {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  display: block;
+}
+
+.listing-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px 16px;
+  font-size: 1rem;
+  color: var(--primary-color);
+}
+
+.listing-location::before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-image: url("/assets/location-pin.svg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+section.listing a {
+  display: inline-block;
+  padding-left: 24px;
+  padding-bottom: 24px;
+  text-decoration: none;
+  color: var(--primary-color);
+  font-weight: 500;
+  transition: color 0.2s ease-in-out;
+}
+
+section.listing a::after {
+  content: "\203A"; /* Unicode for single right-pointing angle quote › */
+  margin-left: 6px;
+  font-size: 1.2rem;
+}

@@ -4,13 +4,14 @@ import { HousingLocation } from "../../interfaces/housing-location.interface";
 import { RouterModule } from "@angular/router";
 
 @Component({
-  selector: "app-housing-location",
+  selector: "housing-location-card",
   standalone: true,
   imports: [CommonModule, RouterModule],
-  templateUrl: "./housing-location.component.html",
-  styleUrls: ["./housing-location.component.css"],
+  templateUrl: "./housing-location-card.component.html",
+  styleUrls: ["./housing-location-card.component.css"],
 })
-export class HousingLocationComponent {
+export class HousingLocationCardComponent {
   // Uses the non-null assertion operator (!) to indicate the input will be initialized by the parent
-  @Input() housingLocation!: HousingLocation;
+  @Input()
+  housingLocation!: HousingLocation;
 }

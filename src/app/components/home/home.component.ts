@@ -1,13 +1,13 @@
 import { Component, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
-import { HousingLocationComponent } from "../housing-location/housing-location.component";
+import { HousingLocationCardComponent } from "../housing-location-card/housing-location-card.component";
 import { HousingLocation } from "../../interfaces/housing-location.interface";
 import { HousingService } from "../../services/housing.service";
 
 @Component({
   selector: "app-home",
   standalone: true,
-  imports: [CommonModule, HousingLocationComponent],
+  imports: [CommonModule, HousingLocationCardComponent],
   templateUrl: "./home.component.html",
   styleUrls: ["./home.component.css"],
 })
@@ -39,7 +39,7 @@ export class HomeComponent {
     // Performs case-insensitive match against city names
     this.filteredHousingLocationList = this.originalHousingLocationList.filter(
       (location) =>
-        location.city.toLowerCase().includes(searchText.toLowerCase())
+        location.city.toLowerCase().includes(searchText.toLowerCase()),
     );
   }
 }

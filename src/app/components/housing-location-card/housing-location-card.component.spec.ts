@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { HousingLocationComponent } from "./housing-location.component";
+import { HousingLocationCardComponent } from "./housing-location-card.component";
 import { RouterTestingModule } from "@angular/router/testing";
 import { HousingLocation } from "../../interfaces/housing-location.interface";
 
 describe("HousingLocationComponent", () => {
-  let component: HousingLocationComponent;
-  let fixture: ComponentFixture<HousingLocationComponent>;
+  let component: HousingLocationCardComponent;
+  let fixture: ComponentFixture<HousingLocationCardComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [HousingLocationComponent, RouterTestingModule],
+      imports: [HousingLocationCardComponent, RouterTestingModule],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(HousingLocationComponent);
+    fixture = TestBed.createComponent(HousingLocationCardComponent);
     component = fixture.componentInstance;
   });
 
@@ -28,15 +28,15 @@ describe("HousingLocationComponent", () => {
       city: "Test City",
       state: "TS",
       photo: "test.jpg",
-      availableUnits: 5,
+      available_units: 5,
       wifi: true,
       laundry: false,
     };
 
     fixture.detectChanges(); // updates template with input
 
-    const anchor: HTMLAnchorElement | null =
-      fixture.nativeElement.querySelector("a");
+    const anchor: HTMLAnchorElement | null = fixture.nativeElement
+      .querySelector("a");
 
     // Check if the link points to the correct details page
     expect(anchor?.getAttribute("href")).toBe("/details/1");

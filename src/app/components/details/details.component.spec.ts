@@ -13,7 +13,7 @@ const mockHousingLocation: HousingLocation = {
   city: "Test City",
   state: "TS",
   photo: "test.jpg",
-  availableUnits: 3,
+  available_units: 3,
   wifi: true,
   laundry: false,
 };
@@ -77,7 +77,7 @@ describe("DetailsComponent", () => {
     expect(mockHousingService.submitApplication).toHaveBeenCalledWith(
       "John",
       "Doe",
-      "john@example.com"
+      "john@example.com",
     );
   });
 
@@ -93,7 +93,7 @@ describe("DetailsComponent", () => {
     expect(mockHousingService.submitApplication).toHaveBeenCalledWith(
       "",
       "",
-      ""
+      "",
     );
   });
 });

@@ -1,6 +1,6 @@
 import { Injectable } from "@angular/core";
 import { HousingLocation } from "../interfaces/housing-location.interface";
-import { supabase } from "supabase/supabase.service";
+import { supabase } from "src/app/services/supabase.service";
 
 @Injectable({
   providedIn: "root",
