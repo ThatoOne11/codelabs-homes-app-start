@@ -1,54 +1,67 @@
 import { Injectable } from "@angular/core";
 import { HousingLocation } from "../interfaces/housing-location.interface";
-import { environment } from "../../environments/environment";
+import { supabase } from "supabase/supabase.service";
 
 @Injectable({
   providedIn: "root",
 })
 export class HousingService {
-  private url = `${environment.apiUrl}/locations`;
-
   constructor() {}
 
   async getAllHousingLocations(): Promise<HousingLocation[]> {
     try {
-      const response = await fetch(this.url);
-      if (!response.ok) {
-        // Handles HTTP errors (e.g. 404, 500)
-        throw new Error(`Failed to fetch locations: ${response.statusText}`);
+      // Query all rows from the 'locations' table using Supabase client
+      const { data, error } = await supabase
+        .from("locations")
+        .select("*");
+
+      // Throw error if Supabase returns an error object
+      if (error) {
+        throw new Error(`Failed to fetch locations: ${error.message}`);
       }
-      return (await response.json()) ?? [];
+      // Return fetched data or empty array if data is null/undefined
+      return data ?? [];
     } catch (error) {
-      // Catches network errors or JSON parsing issues
-      console.error("Error fetching all housing locations:", error);
+      // Log errors from network or Supabase and return empty array
+      console.error("Internal Error:", error);
       return [];
     }
   }
 
   async getHousingLocationById(
-    id: number
+    id: number,
   ): Promise<HousingLocation | undefined> {
     try {
-      const response = await fetch(`${this.url}/${id}`);
-      if (!response.ok) {
+      // Query 'locations' table filtering by id and expect a single row
+      const { data, error } = await supabase
+        .from("locations")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      // Throw error if Supabase returns one for this query
+      if (error) {
         throw new Error(
-          `Location with ID ${id} not found: ${response.statusText}`
+          `Failed to fetch location with ID ${id}: ${error.message}`,
         );
       }
-      return await response.json();
+      // Return the single location object or undefined if not found
+      return data;
     } catch (error) {
-      console.error(`Error fetching housing location with ID ${id}:`, error);
+      // Log errors and return undefined on failure
+      console.error(`Internal Error:`, error);
       return undefined;
     }
   }
 
   submitApplication(firstName: string, lastName: string, email: string): void {
-    // TODO: Placeholder for future API call; currently logs submission
     try {
+      // Currently just logs the application data to the console
       console.log(
-        `Application submitted for ${firstName} ${lastName} with email ${email}`
+        `Application submitted for ${firstName} ${lastName} with email ${email}`,
       );
     } catch (error) {
+      // Catch and log any errors during logging
       console.error("Error submitting application:", error);
     }
   }
