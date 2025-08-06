@@ -36,6 +36,9 @@ export class DetailsComponent {
           `Failed to load location with ID ${housingLocationId}:`,
           error,
         );
+        alert(
+          `Failed to load housing location. Please try again later. ${error.message}`,
+        );
       });
   }
 
@@ -48,6 +51,7 @@ export class DetailsComponent {
       );
     } catch (error) {
       console.error("Application submission failed:", error);
+      alert("Failed to submit application. Please try again later.");
     }
   }
 }

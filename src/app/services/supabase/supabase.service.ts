@@ -59,7 +59,7 @@ export class SupabaseService {
             .single();
     }
 
-    // Method to listen to auth state changes for the application and update the user state to display the correct UI/navbar
+    // Method to listen to auth state changes for the application and update the user state to display the correct UI/navbar with the profile icon
     onAuthStateChange(
         callback: Parameters<typeof this.supabase.auth.onAuthStateChange>[0],
     ) {

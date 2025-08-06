@@ -9,6 +9,9 @@ import { inject } from "@angular/core";
 export class HousingService {
   private readonly supabase = inject(SupabaseService);
 
+  // Method to get all housing locations
+  // This method is used in HomeComponent to fetch all locations initially
+  // It returns an array of HousingLocation objects or an empty array if no locations are found
   async getAllHousingLocations(): Promise<HousingLocation[]> {
     try {
       const { data, error } = await this.supabase.getLocations();
@@ -24,6 +27,9 @@ export class HousingService {
     }
   }
 
+  // Method to get a housing location by ID
+  // This method is used in HousingLocationCardComponent to fetch details of a specific location
+  // It returns a single HousingLocation object or undefined if not found
   async getHousingLocationById(
     id: number,
   ): Promise<HousingLocation | undefined> {
@@ -41,6 +47,21 @@ export class HousingService {
       console.error(`Internal Error:`, error);
       return undefined;
     }
+  }
+
+  // Method to get filtered housing locations based on search text
+  // This method is used in HomeComponent to filter locations based on user input
+  async getFilteredLocations(search: string): Promise<HousingLocation[]> {
+    const { data, error } = await this.supabase.getLocations();
+    if (error || !data) throw new Error("Failed to fetch housing locations");
+
+    const query = search.toLowerCase().trim();
+
+    if (!query) return data;
+
+    return data.filter((location) =>
+      `${location.name} ${location.city}`.toLowerCase().includes(query)
+    );
   }
 
   submitApplication(firstName: string, lastName: string, email: string): void {
