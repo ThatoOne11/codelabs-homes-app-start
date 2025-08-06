@@ -9,9 +9,7 @@ export const authGuard: CanActivateFn = async (route, state) => {
   const user = await supabaseService.getUser();
   if (!user) {
     // Tell Angular Router to send the user to the login page
-    return router.createUrlTree(["/login"], {
-      queryParams: { returnUrl: state.url },
-    });
+    return router.createUrlTree(["/login"], {});
   }
   return true;
 };
