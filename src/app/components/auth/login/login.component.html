@@ -1,0 +1,26 @@
+<div class="container">
+  <h2>Login</h2>
+  <form (ngSubmit)="signInWithEmail()" #loginForm="ngForm" novalidate>
+    <input
+      type="email"
+      [(ngModel)]="email"
+      name="email"
+      placeholder="Email"
+      required
+      autocomplete="email"
+    />
+    <input
+      type="password"
+      [(ngModel)]="password"
+      name="password"
+      placeholder="Password"
+      required
+      autocomplete="current-password"
+    />
+    <button type="submit" [disabled]="loginForm.invalid">Sign In</button>
+  </form>
+  <p>
+    Don't have an account?
+    <a (click)="navigateToSignup()" role="button" tabindex="0">Sign Up</a>
+  </p>
+</div>

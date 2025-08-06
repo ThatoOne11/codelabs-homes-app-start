@@ -1,0 +1,15 @@
+<div class="container">
+  <h2>User Profile</h2>
+  <p>
+    Congratulations! Welcome to secure auth with Angular + Supabase is running.
+    🎉
+  </p>
+
+  <div *ngIf="user">
+    <p>User ID: {{ user.id }}</p>
+    <p>Email: {{ user.email }}</p>
+    <p>Display Name: {{ user.user_metadata.displayName }}</p>
+  </div>
+
+  <button (click)="signOut()">Sign Out</button>
+</div>

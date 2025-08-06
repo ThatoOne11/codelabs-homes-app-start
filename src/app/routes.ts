@@ -1,18 +1,51 @@
 import { Routes } from "@angular/router";
-import { HomeComponent } from "./components/home/home.component";
+import { authGuard } from "./guards/auth.guard";
 import { DetailsComponent } from "./components/details/details.component";
+import { HomeComponent } from "./components/home/home.component";
 
 const routeConfig: Routes = [
   {
     path: "",
+    redirectTo: "/login",
+    pathMatch: "full",
+  }, // Redirect empty path to login
+  {
+    path: "login",
+    loadComponent: () =>
+      import("./components/auth/login/login.component").then(
+        (m) => m.LoginComponent,
+      ),
+    title: "Login page",
+  }, // Login
+  {
+    path: "signup",
+    loadComponent: () =>
+      import("./components/auth/signup/signup.component").then(
+        (m) => m.SignupComponent,
+      ),
+    title: "Signup page",
+  }, // Signup
+  {
+    path: "home",
     component: HomeComponent,
+    canActivate: [authGuard], // Protect Home page
     title: "Home page",
-  }, // This is the default route that will be loaded when the application starts
+  },
   {
     path: "details/:id",
     component: DetailsComponent,
+    canActivate: [authGuard], // Protect Details page
     title: "Details page",
-  }, // This route will load the DetailsComponent when the URL matches 'details/:id'
+  },
+  {
+    path: "profile",
+    loadComponent: () =>
+      import("./components/profile/profile.component").then(
+        (m) => m.ProfileComponent,
+      ),
+    canActivate: [authGuard], // Protect Profile page
+    title: "Profile page",
+  },
 ];
 
 export default routeConfig;

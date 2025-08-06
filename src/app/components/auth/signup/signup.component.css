@@ -1,0 +1,84 @@
+.container {
+  max-width: 400px;
+  margin: 50px auto;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px var(--shadow-color);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.container h2 {
+  margin: 0 0 12px;
+  font-weight: 700;
+  font-size: 2rem;
+  color: var(--primary-color);
+  text-align: center;
+}
+
+.container form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.container input {
+  padding: 14px 18px;
+  font-size: 1.1rem;
+  border: 2px solid var(--shadow-color);
+  border-radius: 10px;
+  transition: border-color 0.3s ease;
+  outline-offset: 3px;
+}
+
+/* Sign up button */
+.container button {
+  padding: 14px 18px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+  background-color: var(--primary-color);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+}
+
+.container button:hover {
+  background-color: var(--secondary-color);
+  outline: none;
+}
+
+/* Clickable "Log in" text */
+.container p {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+}
+
+.container p a {
+  color: var(--primary-color);
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+@media (max-width: 480px) {
+  .container {
+    margin: 20px 12px;
+    padding: 18px;
+  }
+
+  .container input,
+  .container button {
+    font-size: 1rem;
+    padding: 12px 14px;
+  }
+
+  .container h2 {
+    font-size: 1.5rem;
+  }
+}

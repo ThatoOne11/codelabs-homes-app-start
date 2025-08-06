@@ -1,6 +1,15 @@
 <main>
-  <header class="brand-name">
-    <a href="/"><img src="assets/logo.svg" alt="Logo" aria-hidden="true" /></a>
+  <header>
+    <div class="navbar-content">
+      <a class="logo-link" routerLink="/home">
+        <img src="assets/logo.svg" alt="Logo" aria-hidden="true" />
+      </a>
+      <div class="nav-right" *ngIf="isLoggedIn()">
+        <a class="profile-settings" routerLink="/profile">
+          <img src="assets/profile.svg" alt="profile" aria-hidden="true" />
+        </a>
+      </div>
+    </div>
   </header>
   <section class="content">
     <router-outlet></router-outlet>

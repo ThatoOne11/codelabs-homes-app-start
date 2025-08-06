@@ -2,7 +2,7 @@ import { Component, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { HousingLocationCardComponent } from "../housing-location-card/housing-location-card.component";
 import { HousingLocation } from "../../interfaces/housing-location.interface";
-import { HousingService } from "../../services/housing.service";
+import { HousingService } from "../../services/housing/housing.service";
 
 @Component({
   selector: "app-home",
