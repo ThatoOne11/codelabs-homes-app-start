@@ -65,12 +65,17 @@ export class HousingService {
   }
 
   submitApplication(firstName: string, lastName: string, email: string): void {
+    // TODO: send the application data to a backend service
     try {
       console.log(
         `Application submitted for ${firstName} ${lastName} with email ${email}`,
       );
+      alert(
+        `Application submitted for ${firstName} ${lastName}. We will contact you at ${email} soon.`,
+      );
     } catch (error) {
       console.error("Error submitting application:", error);
+      alert("Failed to submit application. Please try again later.");
     }
   }
 }

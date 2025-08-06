@@ -1,6 +1,6 @@
 import { Component, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
-import { ActivatedRoute } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 import { HousingService } from "../../services/housing/housing.service";
 import { HousingLocation } from "../../interfaces/housing-location.interface";
 import { FormControl, FormGroup, ReactiveFormsModule } from "@angular/forms";
@@ -15,6 +15,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from "@angular/forms";
 export class DetailsComponent {
   route = inject(ActivatedRoute);
   housingService = inject(HousingService);
+  private readonly router = inject(Router);
 
   housingLocation: HousingLocation | undefined;
 
@@ -49,6 +50,7 @@ export class DetailsComponent {
         this.applyForm.value.lastName ?? "",
         this.applyForm.value.email ?? "",
       );
+      this.router.navigate(["/home"]);
     } catch (error) {
       console.error("Application submission failed:", error);
       alert("Failed to submit application. Please try again later.");
