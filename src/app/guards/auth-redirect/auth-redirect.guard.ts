@@ -1,4 +1,3 @@
-// src/app/guards/auth-redirect.guard.ts
 import { inject } from "@angular/core";
 import { Router } from "@angular/router";
 import { SupabaseService } from "../../services/supabase/supabase.service";
@@ -15,5 +14,5 @@ export const authRedirectGuard = async () => {
     return router.navigate(["/home"]).then(() => false);
   }
 
-  return true; // Allow access to login/signup
+  return true;
 };
