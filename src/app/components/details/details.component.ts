@@ -1,9 +1,14 @@
-import { Component, inject } from "@angular/core";
+import { Component, inject, signal } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { ActivatedRoute, Router } from "@angular/router";
 import { HousingService } from "../../services/housing/housing.service";
 import { HousingLocation } from "../../interfaces/housing-location.interface";
-import { FormControl, FormGroup, ReactiveFormsModule } from "@angular/forms";
+import {
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from "@angular/forms";
 
 @Component({
   selector: "app-details",
@@ -19,10 +24,13 @@ export class DetailsComponent {
 
   housingLocation: HousingLocation | undefined;
 
+  message = signal<string | null>(null);
+  messageType = signal<"success" | "error" | null>(null);
+
   applyForm = new FormGroup({
-    firstName: new FormControl(""),
-    lastName: new FormControl(""),
-    email: new FormControl(""),
+    firstName: new FormControl("", Validators.required),
+    lastName: new FormControl("", Validators.required),
+    email: new FormControl("", [Validators.required, Validators.email]),
   });
 
   constructor() {
@@ -33,13 +41,10 @@ export class DetailsComponent {
         this.housingLocation = location;
       })
       .catch((error) => {
-        console.error(
-          `Failed to load location with ID ${housingLocationId}:`,
-          error,
-        );
-        alert(
-          `Failed to load housing location. Please try again later. ${error.message}`,
-        );
+        console.error(`Failed to load location:`, error);
+        this.message.set("Failed to load housing location. Please try again.");
+        this.messageType.set("error");
+        this.clearMessage();
       });
   }
 
@@ -50,10 +55,26 @@ export class DetailsComponent {
         this.applyForm.value.lastName ?? "",
         this.applyForm.value.email ?? "",
       );
-      this.router.navigate(["/home"]);
+
+      this.message.set("Application submitted successfully!");
+      this.messageType.set("success");
+
+      setTimeout(() => {
+        this.router.navigate(["/home"]);
+      }, 1500);
     } catch (error) {
       console.error("Application submission failed:", error);
-      alert("Failed to submit application. Please try again later.");
+      this.message.set("Failed to submit application. Please try again.");
+      this.messageType.set("error");
     }
+
+    this.clearMessage();
+  }
+
+  private clearMessage() {
+    setTimeout(() => {
+      this.message.set(null);
+      this.messageType.set(null);
+    }, 5000);
   }
 }
