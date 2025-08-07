@@ -27,7 +27,9 @@ export class SignupComponent {
     if (error) {
       alert("Error signing up: " + error.message);
     } else {
-      alert("Registration Successful!");
+      alert(
+        "Registration successful! Please check your email for confirmation.",
+      );
       this.router.navigate(["/home"]);
     }
   }
