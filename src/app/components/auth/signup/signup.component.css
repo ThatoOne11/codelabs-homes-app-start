@@ -50,6 +50,11 @@
   outline: none;
 }
 
+.container button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
 /* Clickable "Log in" text */
 .container p {
   text-align: center;

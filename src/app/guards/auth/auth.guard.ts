@@ -1,6 +1,6 @@
 import { inject } from "@angular/core";
 import { Router } from "@angular/router";
-import { SupabaseService } from "../services/supabase/supabase.service";
+import { SupabaseService } from "../../services/supabase/supabase.service";
 
 // Auth Guard to protect routes that require authentication
 // If the user is not authenticated, they will be redirected to the login page
