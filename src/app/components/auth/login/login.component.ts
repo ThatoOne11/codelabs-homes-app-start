@@ -12,8 +12,11 @@ import { CommonModule } from "@angular/common";
   styleUrls: ["./login.component.css"],
 })
 export class LoginComponent {
-  email: string = "";
-  password: string = "";
+  email = "";
+  password = "";
+
+  message = signal<string | null>(null);
+  messageType = signal<"success" | "error" | null>(null);
 
   private readonly supabaseService = inject(SupabaseService);
   private readonly router = inject(Router);
@@ -23,11 +26,22 @@ export class LoginComponent {
       email: this.email,
       password: this.password,
     });
+
     if (error) {
-      alert("Error signing in: " + error.message);
+      this.message.set("Error: " + error.message);
+      this.messageType.set("error");
     } else {
-      this.router.navigate(["/home"]);
+      this.message.set("Signed in successfully!");
+      this.messageType.set("success");
+
+      // Optional delay before navigating
+      setTimeout(() => this.router.navigate(["/home"]), 1500);
     }
+
+    setTimeout(() => {
+      this.message.set(null);
+      this.messageType.set(null);
+    }, 5000);
   }
 
   navigateToSignup() {

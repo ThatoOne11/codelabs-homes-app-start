@@ -4,7 +4,7 @@
       <a class="logo-link" routerLink="/home">
         <img src="assets/logo.svg" alt="Logo" aria-hidden="true" />
       </a>
-      <div class="nav-right" *ngIf="isLoggedIn()">
+      <div class="nav-right" *ngIf="showProfile()">
         <a class="profile-settings" routerLink="/profile">
           <img src="assets/profile.svg" alt="profile" aria-hidden="true" />
         </a>

@@ -1,5 +1,11 @@
 <div class="container">
   <h2>Sign Up</h2>
+
+  <!-- Message box -->
+  <div *ngIf="message()" [ngClass]="messageType()" class="message-box">
+    {{ message() }}
+  </div>
+
   <form>
     <input
       type="text"

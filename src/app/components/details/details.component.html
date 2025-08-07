@@ -24,6 +24,10 @@
 
   <section class="listing-apply">
     <h2 class="section-heading">Apply to live here</h2>
+    <!-- Message box -->
+    <div *ngIf="message()" [ngClass]="messageType()" class="message-box">
+      {{ message() }}
+    </div>
     <form [formGroup]="applyForm" (ngSubmit)="submitApplication()">
       <label for="first-name">First Name</label>
       <input id="first-name" type="text" formControlName="firstName" />
@@ -34,7 +38,9 @@
       <label for="email">Email</label>
       <input id="email" type="email" formControlName="email" />
 
-      <button class="primary" type="submit">Apply Now</button>
+      <button class="primary" type="submit" [disabled]="applyForm.invalid">
+        Apply Now
+      </button>
     </form>
   </section>
 </article>

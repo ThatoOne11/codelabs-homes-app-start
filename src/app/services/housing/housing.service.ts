@@ -49,8 +49,9 @@ export class HousingService {
     }
   }
 
-  // Method to search for housing locations based on a search string and returns an array of HousingLocation objects that match the search criteria
+  // Method to search for housing locations based on a search string
   // This method is used in HomeComponent to filter locations based on user input
+  // It returns an array of HousingLocation objects that match the search criteria
   async getFilteredLocations(search: string): Promise<HousingLocation[]> {
     try {
       const { data, error } = await this.supabase.searchLocations(search);
@@ -72,12 +73,8 @@ export class HousingService {
       console.log(
         `Application submitted for ${firstName} ${lastName} with email ${email}`,
       );
-      alert(
-        `Application submitted for ${firstName} ${lastName}. We will contact you at ${email} soon.`,
-      );
     } catch (error) {
       console.error("Error submitting application:", error);
-      alert("Failed to submit application. Please try again later.");
     }
   }
 }
