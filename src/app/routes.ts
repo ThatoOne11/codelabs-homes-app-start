@@ -46,6 +46,10 @@ const routeConfig: Routes = [
     canActivate: [authGuard], // Protect Profile page
     title: "Profile page",
   },
+  {
+    path: "**",
+    redirectTo: "/home",
+  }, // Redirect any unknown path to home
 ];
 
 export default routeConfig;
