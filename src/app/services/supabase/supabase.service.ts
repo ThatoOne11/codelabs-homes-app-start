@@ -59,6 +59,23 @@ export class SupabaseService {
             .single();
     }
 
+    // Method to search locations based on a search string
+    async searchLocations(search: string) {
+        const trimmed = search.trim().toLowerCase();
+
+        // If no search string, return all
+        if (!trimmed) {
+            return this.getLocations();
+        }
+
+        return this.supabase
+            .from("locations")
+            .select("*")
+            .or(
+                `name.ilike.%${trimmed}%,city.ilike.%${trimmed}%`,
+            ); // searches in both name and city columns
+    }
+
     // Method to listen to auth state changes for the application and update the user state to display the correct UI/navbar with the profile icon
     onAuthStateChange(
         callback: Parameters<typeof this.supabase.auth.onAuthStateChange>[0],

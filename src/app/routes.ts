@@ -1,7 +1,8 @@
 import { Routes } from "@angular/router";
-import { authGuard } from "./guards/auth.guard";
+import { authGuard } from "./guards/auth/auth.guard";
 import { DetailsComponent } from "./components/details/details.component";
 import { HomeComponent } from "./components/home/home.component";
+import { authRedirectGuard } from "../app/guards/auth-redirect/auth-redirect.guard";
 
 const routeConfig: Routes = [
   {
@@ -15,6 +16,7 @@ const routeConfig: Routes = [
       import("./components/auth/login/login.component").then(
         (m) => m.LoginComponent,
       ),
+    canActivate: [authRedirectGuard], // Redirect logged-in users away from login
     title: "Login page",
   }, // Login
   {
@@ -23,6 +25,7 @@ const routeConfig: Routes = [
       import("./components/auth/signup/signup.component").then(
         (m) => m.SignupComponent,
       ),
+    canActivate: [authRedirectGuard], // Redirect logged-in users away from signup
     title: "Signup page",
   }, // Signup
   {
