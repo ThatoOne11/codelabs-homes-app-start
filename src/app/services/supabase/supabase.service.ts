@@ -12,7 +12,7 @@ export class SupabaseService {
     constructor() {
         this.supabase = createClient(
             environment.supabaseAPIUrl,
-            environment.supabaseKey,
+            environment.supabaseAnonKey,
         );
     }
 
@@ -75,27 +75,30 @@ export class SupabaseService {
             ); // searches in both name and city columns
     }
 
-    // Method to check if an email exists in the database
-    // This method is used in SignupComponent to prevent duplicate registrations
-    async checkEmailExists(email: string): Promise<boolean> {
-        const { error } = await this.supabase.auth.signInWithPassword({
-            email,
-            password: "dummyPasswordThatShouldNeverWork",
-        });
+    //Method to check if a user email exists
+    // This method is used in SignupComponent to check if the email already exists
+    async checkUserEmailExists(email: string): Promise<boolean> {
+        // No serviceRoleKey here!
+        const response = await fetch(
+            `${environment.supabaseAPIUrl}/functions/v1/check-user-email`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    // No Authorization header with service role key needed here!
+                    // The Supabase Function will handle authentication/authorization internally.
+                },
+                body: JSON.stringify({ email }),
+            },
+        );
 
-        if (error) {
-            // If the error is "Invalid login credentials", user exists but password is wrong
-            if (error.message.includes("Invalid login credentials")) {
-                return true;
-            }
-            // If the error is "User not found" or similar, user does not exist
-            if (error.message.includes("User not found")) {
-                return false;
-            }
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to check user email");
         }
 
-        // If no error, or unknown error, assume user does not exist to be safe
-        return false;
+        const data = await response.json();
+        return data.exists;
     }
 
     // Method to listen to auth state changes for the application and update the user state to display the correct UI/navbar with the profile icon
