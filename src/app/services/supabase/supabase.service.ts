@@ -75,6 +75,29 @@ export class SupabaseService {
             ); // searches in both name and city columns
     }
 
+    // Method to check if an email exists in the database
+    // This method is used in SignupComponent to prevent duplicate registrations
+    async checkEmailExists(email: string): Promise<boolean> {
+        const { error } = await this.supabase.auth.signInWithPassword({
+            email,
+            password: "dummyPasswordThatShouldNeverWork",
+        });
+
+        if (error) {
+            // If the error is "Invalid login credentials", user exists but password is wrong
+            if (error.message.includes("Invalid login credentials")) {
+                return true;
+            }
+            // If the error is "User not found" or similar, user does not exist
+            if (error.message.includes("User not found")) {
+                return false;
+            }
+        }
+
+        // If no error, or unknown error, assume user does not exist to be safe
+        return false;
+    }
+
     // Method to listen to auth state changes for the application and update the user state to display the correct UI/navbar with the profile icon
     onAuthStateChange(
         callback: Parameters<typeof this.supabase.auth.onAuthStateChange>[0],
