@@ -31,11 +31,23 @@ export class SignupComponent {
   async signUp() {
     if (this.isLoading()) return;
     this.isLoading.set(true);
-
     this.message.set(null);
     this.messageType.set(null);
 
     try {
+      // Check if email already exists before sign up
+      const emailExists = await this.supabaseService.checkUserEmailExists(
+        this.email,
+      );
+      if (emailExists) {
+        this.message.set(
+          "This email is already registered. Please log in or use a different email.",
+        );
+        this.messageType.set("error");
+        return; // stop the signup flow early
+      }
+
+      // Proceed with sign up if email does not exist
       const { data, error } = await this.supabaseService.signUpWithEmail({
         name: this.name,
         email: this.email,
@@ -43,18 +55,8 @@ export class SignupComponent {
       });
 
       if (error) {
-        if (
-          error.message.includes("User already registered") ||
-          error.message.includes("users with this email address already exists")
-        ) {
-          this.message.set(
-            "This email is already registered. Please log in or use a different email.",
-          );
-          this.messageType.set("error");
-        } else {
-          this.message.set("Registration failed: " + error.message);
-          this.messageType.set("error");
-        }
+        this.message.set("Registration failed: " + error.message);
+        this.messageType.set("error");
       } else {
         this.message.set(
           "Registration successful! Check your email to confirm your account.",

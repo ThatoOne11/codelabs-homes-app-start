@@ -72,11 +72,19 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const { users = [] } = await response.json() as {
-      users?: Array<{ email?: string }>;
-    };
+    const data = await response.json();
+    console.log("GoTrue Admin API response:", JSON.stringify(data, null, 2));
+
+    const users = data.users ?? [];
+
+    // Exact email match check
+    const exists = users.some(
+      (user: { email?: string }) =>
+        user.email?.toLowerCase() === normalizedEmail,
+    );
+
     return new Response(
-      JSON.stringify({ exists: users.length > 0 }),
+      JSON.stringify({ exists }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
