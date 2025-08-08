@@ -34,8 +34,7 @@ export class LoginComponent {
       this.message.set("Signed in successfully!");
       this.messageType.set("success");
 
-      // Optional delay before navigating
-      setTimeout(() => this.router.navigate(["/home"]), 1500);
+      setTimeout(() => this.router.navigate(["/home"]), 1000);
     }
 
     setTimeout(() => {
