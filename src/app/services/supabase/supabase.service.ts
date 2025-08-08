@@ -78,7 +78,6 @@ export class SupabaseService {
     //Method to check if a user email exists
     // This method is used in SignupComponent to check if the email already exists
     async checkUserEmailExists(email: string): Promise<boolean> {
-        // No serviceRoleKey here!
         const response = await fetch(
             `${environment.supabaseAPIUrl}/functions/v1/check-user-email`,
             {
