@@ -1,23 +1,21 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-// Environment variables
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const gotrueApiUrl = `${supabaseUrl}/auth/v1`;
 
-// Allowed origins for CORS
-const allowedOrigins = [
-  "http://localhost:4200", // my local dev frontend URL
-  "https://angular-homes-app-8fi.pages.dev", // my deployed frontend URL
-];
+// List of allowed origins for CORS
+const allowedOrigins = new Set([
+  "http://localhost:4200",
+  "https://angular-homes-app-8fi.pages.dev",
+]);
 
 function getCorsHeaders(origin: string | null) {
-  // Use a dynamic header for Access-Control-Allow-Origin based on the incoming origin
-  const allowOrigin = allowedOrigins.includes(origin ?? "") ? origin ?? "" : "";
+  const allowOrigin = origin && allowedOrigins.has(origin) ? origin : "";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 }
 
@@ -25,14 +23,24 @@ serve(async (req: Request): Promise<Response> => {
   const origin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(origin);
 
-  // Handle CORS preflight request FIRST
   if (req.method === "OPTIONS") {
+    // Handle CORS preflight request
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
-    // Parse and validate request body
-    const { email } = await req.json() as { email?: string };
+    if (req.method !== "POST") {
+      return new Response(
+        JSON.stringify({ error: "Method Not Allowed" }),
+        {
+          status: 405,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const { email } = await req.json() as { email?: unknown };
+
     if (!email || typeof email !== "string") {
       return new Response(
         JSON.stringify({ error: "Invalid or missing email" }),
@@ -43,11 +51,10 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // Query GoTrue Admin API directly with email filter
-    // This fetch call *inside* the function is where the service_role_key is used securely.
-    const response = await fetch(
+    // Query GoTrue Admin API securely with service role key
+    const goTrueRes = await fetch(
       `${gotrueApiUrl}/admin/users?email=${
         encodeURIComponent(normalizedEmail)
       }`,
@@ -55,42 +62,41 @@ serve(async (req: Request): Promise<Response> => {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseServiceRoleKey}`, // Used securely inside the serverless function
-          apikey: supabaseServiceRoleKey, // Also add apikey just in case it helps for some GoTrue versions
+          Authorization: `Bearer ${supabaseServiceRoleKey}`,
+          apikey: supabaseServiceRoleKey,
         },
       },
     );
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      console.error("GoTrue error:", errData);
-      // More specific error handling for user not found from GoTrue Admin API
-      if (response.status === 404) { // GoTrue might return 404 for "user not found"
+    if (!goTrueRes.ok) {
+      const errData = await goTrueRes.json().catch(() => ({}));
+      console.error("GoTrue API error:", errData);
+
+      // Return exists: false if user not found (404) for graceful handling
+      if (goTrueRes.status === 404) {
         return new Response(
           JSON.stringify({ exists: false }),
           {
-            status: 200, // Still 200 for a successful check, just user not found
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
       }
+
       return new Response(
         JSON.stringify({ error: errData.msg || "Failed to query user" }),
         {
-          status: response.status,
+          status: goTrueRes.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
     }
 
-    const data = await response.json();
+    const data = await goTrueRes.json();
     console.log("GoTrue Admin API response:", JSON.stringify(data, null, 2));
 
-    // The /admin/users endpoint returns an object with a 'users' array.
-    const users = data.users ?? [];
-
-    // Exact email match check
-    const exists = users.some(
+    // Confirm email existence by exact case-insensitive match
+    const exists = Array.isArray(data.users) && data.users.some(
       (user: { email?: string }) =>
         user.email?.toLowerCase() === normalizedEmail,
     );
@@ -102,11 +108,11 @@ serve(async (req: Request): Promise<Response> => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
-  } catch (err) {
-    console.error("Function error:", err);
+  } catch (error) {
+    console.error("Unhandled function error:", error);
     return new Response(
       JSON.stringify({
-        error: err instanceof Error ? err.message : String(err),
+        error: error instanceof Error ? error.message : String(error),
       }),
       {
         status: 500,
