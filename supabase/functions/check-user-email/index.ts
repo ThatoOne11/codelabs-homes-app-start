@@ -5,16 +5,28 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const gotrueApiUrl = `${supabaseUrl}/auth/v1`;
 
-// CORS headers
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
+// Allowed origins for CORS
+const allowedOrigins = [
+  "http://localhost:4200", // my local dev frontend URL
+  "https://angular-homes-app-8fi.pages.dev", // my deployed frontend URL
+];
+
+function getCorsHeaders(origin: string | null) {
+  return {
+    "Access-Control-Allow-Origin": allowedOrigins.includes(origin ?? "")
+      ? origin ?? ""
+      : "",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
 
 serve(async (req: Request): Promise<Response> => {
-  // Handle preflight requests
+  const origin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
+    // Respond to preflight requests
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
