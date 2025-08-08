@@ -15,15 +15,88 @@
       required
       autocomplete="email"
     />
-    <input
-      type="password"
-      [(ngModel)]="password"
-      name="password"
-      placeholder="Password"
-      required
-      autocomplete="current-password"
-    />
-    <button type="submit" [disabled]="loginForm.invalid">Sign In</button>
+
+    <div class="password-wrapper">
+      <input
+        [type]="isPasswordVisible() ? 'text' : 'password'"
+        [(ngModel)]="password"
+        name="password"
+        placeholder="Password"
+        required
+        autocomplete="current-password"
+      />
+      <button
+        type="button"
+        class="toggle-password"
+        (click)="togglePasswordVisibility()"
+        aria-label="Toggle password visibility"
+        style="
+          background: transparent;
+          border: none;
+          padding: 0;
+          margin: 0;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--primary-color);
+          filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
+          transition: color 0.2s ease, filter 0.2s ease;
+        "
+      >
+        <!-- Eye open icon -->
+        <svg
+          *ngIf="!isPasswordVisible()"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          fill="none"
+          style="
+            width: 22px;
+            height: 22px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            margin: 0;
+            padding: 0;
+            display: block;
+          "
+        >
+          <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path
+            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+          />
+        </svg>
+
+        <!-- Eye closed icon -->
+        <svg
+          *ngIf="isPasswordVisible()"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          fill="none"
+          style="
+            width: 22px;
+            height: 22px;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            margin: 0;
+            padding: 0;
+            display: block;
+          "
+        >
+          <path
+            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.956 9.956 0 012.042-3.362M9.88 9.88a3 3 0 104.24 4.24M6.1 6.1l11.8 11.8"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <button type="submit" [disabled]="loginForm.invalid || isLoading()">
+      <span *ngIf="!isLoading()">Sign In</span>
+      <span *ngIf="isLoading()" class="spinner"></span>
+    </button>
   </form>
 
   <p>

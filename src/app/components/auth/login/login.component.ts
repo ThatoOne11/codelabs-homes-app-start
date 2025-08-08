@@ -17,11 +17,20 @@ export class LoginComponent {
 
   message = signal<string | null>(null);
   messageType = signal<"success" | "error" | null>(null);
+  isPasswordVisible = signal(false);
+  isLoading = signal(false);
 
   private readonly supabaseService = inject(SupabaseService);
   private readonly router = inject(Router);
 
+  togglePasswordVisibility() {
+    this.isPasswordVisible.update((v) => !v);
+  }
+
   async signInWithEmail() {
+    if (this.isLoading()) return;
+    this.isLoading.set(true);
+
     const { error } = await this.supabaseService.signInWithEmail({
       email: this.email,
       password: this.password,
@@ -30,11 +39,16 @@ export class LoginComponent {
     if (error) {
       this.message.set("Error: " + error.message);
       this.messageType.set("error");
+      this.isLoading.set(false);
     } else {
       this.message.set("Signed in successfully!");
       this.messageType.set("success");
 
-      setTimeout(() => this.router.navigate(["/home"]), 1000);
+      // Delay navigation to show animation
+      setTimeout(() => {
+        this.router.navigate(["/home"]);
+        this.isLoading.set(false);
+      }, 1500);
     }
 
     setTimeout(() => {
