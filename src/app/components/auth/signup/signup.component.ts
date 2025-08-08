@@ -23,33 +23,38 @@ export class SignupComponent {
   private readonly router = inject(Router);
 
   async signUp() {
-    const { data, error } = await this.supabaseService.signUpWithEmail({
+    const emailExists = await this.supabaseService.checkEmailExists(this.email);
+
+    if (emailExists) {
+      this.message.set(
+        "This email is already registered. Please login instead.",
+      );
+      this.messageType.set("error");
+
+      setTimeout(() => {
+        this.message.set(null);
+        this.messageType.set(null);
+      }, 5000);
+
+      return;
+    }
+
+    // If email does not exist, proceed with signup
+    const { error } = await this.supabaseService.signUpWithEmail({
       name: this.name,
       email: this.email,
       password: this.password,
     });
 
     if (error) {
-      // Check if error is "User already registered" or similar
-      if (
-        error.message.includes("already registered") ||
-        error.message.includes("User already registered")
-      ) {
-        this.message.set(
-          "This email is already registered. Please login instead.",
-        );
-      } else {
-        this.message.set("Error: " + error.message);
-      }
+      this.message.set("Error: " + error.message);
       this.messageType.set("error");
     } else {
       this.message.set("Registration successful! Check your email to confirm.");
       this.messageType.set("success");
-      // Optional delay before navigating
-      setTimeout(() => this.router.navigate(["/home"]), 1000);
+      setTimeout(() => this.router.navigate(["/home"]), 2000);
     }
 
-    // Auto-clear after 5 seconds
     setTimeout(() => {
       this.message.set(null);
       this.messageType.set(null);
