@@ -12,10 +12,10 @@ const allowedOrigins = [
 ];
 
 function getCorsHeaders(origin: string | null) {
+  // Use a dynamic header for Access-Control-Allow-Origin based on the incoming origin
+  const allowOrigin = allowedOrigins.includes(origin ?? "") ? origin ?? "" : "";
   return {
-    "Access-Control-Allow-Origin": allowedOrigins.includes(origin ?? "")
-      ? origin ?? ""
-      : "",
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
@@ -25,8 +25,8 @@ serve(async (req: Request): Promise<Response> => {
   const origin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(origin);
 
+  // Handle CORS preflight request FIRST
   if (req.method === "OPTIONS") {
-    // Respond to preflight requests
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
@@ -46,6 +46,7 @@ serve(async (req: Request): Promise<Response> => {
     const normalizedEmail = email.toLowerCase();
 
     // Query GoTrue Admin API directly with email filter
+    // This fetch call *inside* the function is where the service_role_key is used securely.
     const response = await fetch(
       `${gotrueApiUrl}/admin/users?email=${
         encodeURIComponent(normalizedEmail)
@@ -54,8 +55,8 @@ serve(async (req: Request): Promise<Response> => {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseServiceRoleKey}`,
-          apikey: supabaseServiceRoleKey,
+          Authorization: `Bearer ${supabaseServiceRoleKey}`, // Used securely inside the serverless function
+          apikey: supabaseServiceRoleKey, // Also add apikey just in case it helps for some GoTrue versions
         },
       },
     );
@@ -63,6 +64,16 @@ serve(async (req: Request): Promise<Response> => {
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       console.error("GoTrue error:", errData);
+      // More specific error handling for user not found from GoTrue Admin API
+      if (response.status === 404) { // GoTrue might return 404 for "user not found"
+        return new Response(
+          JSON.stringify({ exists: false }),
+          {
+            status: 200, // Still 200 for a successful check, just user not found
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
       return new Response(
         JSON.stringify({ error: errData.msg || "Failed to query user" }),
         {
@@ -75,6 +86,7 @@ serve(async (req: Request): Promise<Response> => {
     const data = await response.json();
     console.log("GoTrue Admin API response:", JSON.stringify(data, null, 2));
 
+    // The /admin/users endpoint returns an object with a 'users' array.
     const users = data.users ?? [];
 
     // Exact email match check
