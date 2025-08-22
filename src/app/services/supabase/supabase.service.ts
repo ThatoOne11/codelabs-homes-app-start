@@ -84,6 +84,7 @@ export class SupabaseService {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "Authorization": `Bearer ${environment.supabaseAnonKey}`,
                     // No Authorization header with service role key needed here!
                     // The Supabase Function will handle authentication/authorization internally.
                 },
