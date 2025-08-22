@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "supabase/functions/**"
-      - "supabase/email_templates/**"
+      - "supabase/email templates/**"
 
 jobs:
   deploy:
