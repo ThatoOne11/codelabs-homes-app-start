@@ -21,9 +21,6 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install Supabase CLI
-        run: npm install -g supabase
-
       # ----------------------------
       # Detect changed edge functions
       # ----------------------------
@@ -42,7 +39,7 @@ jobs:
           echo "Functions to deploy: ${{ steps.changes.outputs.changed }}"
           for fn in ${{ steps.changes.outputs.changed }}; do
             echo "🚀 Deploying function: $fn"
-            supabase functions deploy "$fn" --project-ref $PROJECT_ID
+            npx supabase functions deploy "$fn" --project-ref $PROJECT_ID
           done
 
       # ----------------------------
@@ -64,4 +61,4 @@ jobs:
           PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
           echo "📩 Updating Auth email templates..."
-          supabase db push --project-ref $PROJECT_ID
+          npx supabase db push --project-ref $PROJECT_ID
