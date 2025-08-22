@@ -7,15 +7,20 @@ on:
     paths:
       - "supabase/functions/**"
       - "supabase/email_templates/**"
-  workflow_dispatch: # 👈 allows manual runs
+  workflow_dispatch: # allows manual trigger
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # ----------------------------
+      # Checkout
+      # ----------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 👈 ensures HEAD^ exists
 
       - name: Setup Node.js (for Supabase CLI)
         uses: actions/setup-node@v4
@@ -23,12 +28,31 @@ jobs:
           node-version: 18
 
       # ----------------------------
+      # Determine git diff range
+      # ----------------------------
+      - name: Determine git diff range
+        id: git_range
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual run: try HEAD^ if exists, else fallback to HEAD
+            if git rev-parse HEAD^ >/dev/null 2>&1; then
+              RANGE="HEAD^ HEAD"
+            else
+              RANGE="HEAD"
+            fi
+          else
+            # Push event: use GitHub-provided SHAs
+            RANGE="${{ github.event.before }} ${{ github.sha }}"
+          fi
+          echo "range=$RANGE" >> $GITHUB_OUTPUT
+
+      # ----------------------------
       # Detect changed edge functions
       # ----------------------------
       - name: Get changed functions
         id: changes
         run: |
-          CHANGED_FUNCS=$(git diff --name-only HEAD^ HEAD | grep '^supabase/functions/' | cut -d'/' -f3 | uniq)
+          CHANGED_FUNCS=$(git diff --name-only ${{ steps.git_range.outputs.range }} | grep '^supabase/functions/' | cut -d'/' -f3 | uniq)
           echo "changed=$CHANGED_FUNCS" >> $GITHUB_OUTPUT
 
       - name: Deploy changed Edge Functions
@@ -49,7 +73,7 @@ jobs:
       - name: Check if email templates changed
         id: email
         run: |
-          if git diff --name-only HEAD^ HEAD | grep -q '^supabase/email_templates/.*\.html$'; then
+          if git diff --name-only ${{ steps.git_range.outputs.range }} | grep -q '^supabase/email_templates/.*\.html$'; then
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
