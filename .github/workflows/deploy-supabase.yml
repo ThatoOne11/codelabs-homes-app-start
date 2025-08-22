@@ -7,7 +7,7 @@ on:
     paths:
       - "supabase/functions/**"
       - "supabase/email_templates/**"
-  workflow_dispatch: # 👈 allows manual trigger
+  workflow_dispatch: # allows manual trigger
 
 jobs:
   deploy:
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2 # 👈 ensures we have history for HEAD^
+          fetch-depth: 0 # 👈 fetch full history for reliable diffs
 
       - name: Setup Node.js (for Supabase CLI)
         uses: actions/setup-node@v4
