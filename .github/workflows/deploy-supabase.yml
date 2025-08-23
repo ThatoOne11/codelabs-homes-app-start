@@ -50,25 +50,45 @@ jobs:
             echo "Push event, using range: $RANGE"
           fi
 
-          CHANGED_FILES=$(git diff --name-only "$RANGE" || true)
+          # Use --name-status to detect added, modified, and deleted files
+          CHANGED_FILES=$(git diff --name-status "$RANGE" || true)
           echo "Determined git diff range: $RANGE"
 
-          # Detect changed functions
-          FUNCS_TO_DEPLOY=$(echo "$CHANGED_FILES" | grep '^supabase/functions/' | cut -d'/' -f3 | sort -u | grep -E '^[a-zA-Z][a-zA-Z0-9_-]*$' || true)
+          # Process Functions
+          # Detect and prepare functions to deploy (added/modified)
+          FUNCS_TO_DEPLOY=$(echo "$CHANGED_FILES" | grep -E '^A|^M' | grep 'supabase/functions/' | cut -d'/' -f3 | sort -u | grep -E '^[a-zA-Z][a-zA-Z0-9_-]*$' || true)
           if [ -n "$FUNCS_TO_DEPLOY" ]; then
             echo "functions_changed=true" >> $GITHUB_OUTPUT
             echo "functions_list=$(echo "$FUNCS_TO_DEPLOY" | tr '\n' ' ')" >> $GITHUB_OUTPUT
             echo "functions_pretty=$(echo "$FUNCS_TO_DEPLOY" | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
           fi
 
-          # Detect changed email templates
-          CHANGED_EMAILS_RAW=$(echo "$CHANGED_FILES" | grep '^supabase/email_templates/.*\.html$' | sort -u || true)
+          # Detect functions to delete
+          FUNCS_TO_DELETE=$(echo "$CHANGED_FILES" | grep '^D' | grep 'supabase/functions/' | cut -d'/' -f3 | sort -u | grep -E '^[a-zA-Z][a-zA-Z0-9_-]*$' || true)
+          if [ -n "$FUNCS_TO_DELETE" ]; then
+            echo "functions_deleted=true" >> $GITHUB_OUTPUT
+            echo "functions_to_delete=$(echo "$FUNCS_TO_DELETE" | tr '\n' ' ')" >> $GITHUB_OUTPUT
+            echo "functions_to_delete_pretty=$(echo "$FUNCS_TO_DELETE" | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
+          fi
+
+          # Process Email Templates
+          # Detect and prepare templates to deploy (added/modified)
+          CHANGED_EMAILS_RAW=$(echo "$CHANGED_FILES" | grep -E '^A|^M' | grep 'supabase/email_templates/.*\.html$' | sort -u || true)
           if [ -n "$CHANGED_EMAILS_RAW" ]; then
-            CHANGED_EMAIL_PATHS=$(echo "$CHANGED_EMAILS_RAW" | paste -sd "," -)
-            CHANGED_EMAIL_BASENAMES=$(echo "$CHANGED_EMAILS_RAW" | xargs -n 1 basename | paste -sd "," -)
+            CHANGED_EMAIL_PATHS=$(echo "$CHANGED_EMAILS_RAW" | sed 's/^[AM]\t//' | paste -sd "," -)
+            CHANGED_EMAIL_BASENAMES=$(echo "$CHANGED_EMAILS_RAW" | sed 's/^[AM]\t//' | xargs -n 1 basename | paste -sd "," -)
             echo "email_changed=true" >> $GITHUB_OUTPUT
             echo "email_files=$CHANGED_EMAIL_PATHS" >> $GITHUB_OUTPUT
             echo "email_pretty=$CHANGED_EMAIL_BASENAMES" >> $GITHUB_OUTPUT
+          fi
+
+          # Detect templates to delete. This is a special case as we don't 'delete' them
+          # but rather overwrite with an empty string or a generic template.
+          DELETED_EMAILS_RAW=$(echo "$CHANGED_FILES" | grep '^D' | grep 'supabase/email_templates/.*\.html$' | sort -u || true)
+          if [ -n "$DELETED_EMAILS_RAW" ]; then
+            DELETED_EMAIL_BASENAMES=$(echo "$DELETED_EMAILS_RAW" | sed 's/^D\t//' | xargs -n 1 basename | paste -sd "," -)
+            echo "email_deleted=true" >> $GITHUB_OUTPUT
+            echo "email_to_delete=$DELETED_EMAIL_BASENAMES" >> $GITHUB_OUTPUT
           fi
 
       - name: Deploy changed Edge Functions (Batch)
@@ -78,7 +98,16 @@ jobs:
           echo "🚀 Deploying functions: $(echo "$FUNCS" | tr ' ' ',')"
           npx supabase functions deploy $FUNCS --project-ref $PROJECT_ID
 
-      - name: Sync Auth Email Templates
+      - name: Delete removed Edge Functions
+        if: steps.deploy_prep.outputs.functions_deleted == 'true'
+        run: |
+          FUNCS_TO_DELETE=${{ steps.deploy_prep.outputs.functions_to_delete }}
+          echo "🗑️ Deleting functions: $(echo "$FUNCS_TO_DELETE" | tr ' ' ',')"
+          for func_name in $FUNCS_TO_DELETE; do
+            npx supabase functions delete $func_name --project-ref $PROJECT_ID
+          done
+
+      - name: Sync Auth Email Templates (Add/Update)
         if: steps.deploy_prep.outputs.email_changed == 'true'
         run: |
           echo "📩 Updating Auth email templates..."
@@ -109,6 +138,35 @@ jobs:
             -d "$PAYLOAD"
           echo "✅ Auth email templates updated successfully."
 
+      - name: Handle Deleted Auth Email Templates
+        if: steps.deploy_prep.outputs.email_deleted == 'true'
+        run: |
+          echo "🗑️ Resetting deleted Auth email templates..."
+          declare -A TEMPLATE_KEYS
+          TEMPLATE_KEYS["invite.html"]="mailer_templates_invite_content"
+          TEMPLATE_KEYS["reset_password.html"]="mailer_templates_recovery_content"
+          TEMPLATE_KEYS["confirm_signup.html"]="mailer_templates_confirmation_content"
+          TEMPLATE_KEYS["magic_link.html"]="mailer_templates_magic_link_content"
+          TEMPLATE_KEYS["change_email.html"]="mailer_templates_email_change_content"
+
+          PAYLOAD="{"
+          IFS=',' read -ra FILES <<< "${{ steps.deploy_prep.outputs.email_to_delete }}"
+          for filename in "${FILES[@]}"; do
+            key=${TEMPLATE_KEYS[$filename]}
+            if [ -n "$key" ]; then
+              # Overwrite with empty content, which effectively "resets" it
+              PAYLOAD="$PAYLOAD\"$key\":\"\","
+              echo "Resetting template: $filename"
+            fi
+          done
+          PAYLOAD="${PAYLOAD%,}}"
+
+          curl -s -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_ID/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
+          echo "✅ Deleted Auth email templates were reset."
+
       - name: Deployment Summary & Slack Notification
         if: always()
         id: summary_slack
@@ -117,8 +175,15 @@ jobs:
           if [ "${{ steps.deploy_prep.outputs.functions_changed }}" == "true" ]; then
             SUMMARY+="- Functions deployed: \`${{ steps.deploy_prep.outputs.functions_pretty }}\`\n"
           fi
+          if [ "${{ steps.deploy_prep.outputs.functions_deleted }}" == "true" ]; then
+            # Corrected line: use the new 'functions_to_delete_pretty' output
+            SUMMARY+="- Functions deleted: \`${{ steps.deploy_prep.outputs.functions_to_delete_pretty }}\`\n"
+          fi
           if [ "${{ steps.deploy_prep.outputs.email_changed }}" == "true" ]; then
-            SUMMARY+="- Email templates deployed: \`${{ steps.deploy_prep.outputs.email_pretty }}\`\n"
+            SUMMARY+="- Email templates updated: \`${{ steps.deploy_prep.outputs.email_pretty }}\`\n"
+          fi
+          if [ "${{ steps.deploy_prep.outputs.email_deleted }}" == "true" ]; then
+            SUMMARY+="- Email templates reset: \`${{ steps.deploy_prep.outputs.email_to_delete }}\`\n"
           fi
           if [ -z "$SUMMARY" ]; then
             SUMMARY="- No changes detected. No deployments were necessary."
