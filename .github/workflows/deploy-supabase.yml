@@ -25,13 +25,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # `fetch-depth: 0` is required for `git diff` to work correctly.
           fetch-depth: 0
 
       - name: Setup Node.js and dependencies
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 18.x
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -41,122 +40,101 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Determine the commit range based on the trigger type
-          RANGE=""
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            RANGE="HEAD^..HEAD"
             if [ -n "${{ github.event.inputs.commit_sha }}" ]; then
               RANGE="${{ github.event.inputs.commit_sha }}^..${{ github.event.inputs.commit_sha }}"
-            else
-              RANGE="HEAD^..HEAD"
             fi
           else
             RANGE="${{ github.event.before }}..${{ github.sha }}"
           fi
-
           echo "Using git diff range: $RANGE"
 
-          # Use `git diff --name-status` to get added, modified, and deleted files.
-          CHANGED_FILES=$(git diff --name-status "$RANGE" || true)
+          # Use `sort -u` to deduplicate the list of function names and file paths.
+          mapfile -t changed_funcs < <(git diff --name-only --diff-filter=AM "$RANGE" | grep 'supabase/functions/' | cut -d'/' -f3 | sort -u | grep -E '^[a-zA-Z][a-zA-Z0-9_-]*$' || true)
+          mapfile -t deleted_funcs < <(git diff --name-only --diff-filter=D "$RANGE" | grep 'supabase/functions/' | cut -d'/' -f3 | sort -u | grep -E '^[a-zA-Z][a-zA-Z0-9_-]*$' || true)
+          mapfile -t changed_emails < <(git diff --name-only --diff-filter=AM "$RANGE" | grep 'supabase/email_templates/.*\.html$' | sort -u || true)
+          mapfile -t deleted_emails < <(git diff --name-only --diff-filter=D "$RANGE" | grep 'supabase/email_templates/.*\.html$' | sort -u || true)
 
-          # --- Process Edge Functions ---
-          # Find new or modified functions
-          FUNCS_TO_DEPLOY=$(echo "$CHANGED_FILES" | grep -E '^A|^M' | grep 'supabase/functions/' | cut -d'/' -f3 | sort -u | grep -E '^[a-zA-Z][a-zA-Z0-9_-]*$' || true)
-          if [ -n "$FUNCS_TO_DEPLOY" ]; then
+          if [ ${#changed_funcs[@]} -gt 0 ]; then
             echo "functions_changed=true" >> $GITHUB_OUTPUT
-            # Use `xargs` to safely handle filenames with spaces and prepare for `supabase functions deploy`.
-            echo "functions_list=$(echo "$FUNCS_TO_DEPLOY" | xargs)" >> $GITHUB_OUTPUT
-            echo "functions_pretty=$(echo "$FUNCS_TO_DEPLOY" | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
+            echo "functions_list=$(IFS=' '; echo "${changed_funcs[*]}")" >> $GITHUB_OUTPUT
+            echo "functions_pretty=$(IFS=,; echo "${changed_funcs[*]}")" >> $GITHUB_OUTPUT
           fi
-
-          # Find deleted functions
-          FUNCS_TO_DELETE=$(echo "$CHANGED_FILES" | grep '^D' | grep 'supabase/functions/' | cut -d'/' -f3 | sort -u | grep -E '^[a-zA-Z][a-zA-Z0-9_-]*$' || true)
-          if [ -n "$FUNCS_TO_DELETE" ]; then
+          if [ ${#deleted_funcs[@]} -gt 0 ]; then
             echo "functions_deleted=true" >> $GITHUB_OUTPUT
-            echo "functions_to_delete=$(echo "$FUNCS_TO_DELETE" | xargs)" >> $GITHUB_OUTPUT
-            echo "functions_to_delete_pretty=$(echo "$FUNCS_TO_DELETE" | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
+            echo "functions_to_delete=$(IFS=' '; echo "${deleted_funcs[*]}")" >> $GITHUB_OUTPUT
+            echo "functions_to_delete_pretty=$(IFS=,; echo "${deleted_funcs[*]}")" >> $GITHUB_OUTPUT
           fi
-
-          # --- Process Email Templates ---
-          # Use `jq` to create a reusable configuration map.
-          EMAIL_MAP=$(jq -nc '{"invite.html":"mailer_templates_invite_content", "reset_password.html":"mailer_templates_recovery_content", "confirm_signup.html":"mailer_templates_confirmation_content", "magic_link.html":"mailer_templates_magic_link_content", "change_email.html":"mailer_templates_email_change_content"}')
-          echo "email_map=$EMAIL_MAP" >> $GITHUB_OUTPUT
-
-          # Find new or modified email templates
-          CHANGED_EMAILS=$(echo "$CHANGED_FILES" | grep -E '^A|^M' | grep 'supabase/email_templates/.*\.html$' | sort -u | sed 's/^[AM]\t//' || true)
-          if [ -n "$CHANGED_EMAILS" ]; then
+          if [ ${#changed_emails[@]} -gt 0 ]; then
             echo "email_changed=true" >> $GITHUB_OUTPUT
-            # `readarray` is a robust way to handle multi-line input.
-            readarray -t EMAIL_PATHS <<< "$CHANGED_EMAILS"
-            CHANGED_EMAIL_BASENAMES=$(printf "%s\n" "${EMAIL_PATHS[@]}" | xargs -n 1 basename | paste -sd "," -)
-            echo "email_files=${EMAIL_PATHS[*]}" >> $GITHUB_OUTPUT
-            echo "email_pretty=$CHANGED_EMAIL_BASENAMES" >> $GITHUB_OUTPUT
+            echo "email_files=$(IFS=,; echo "${changed_emails[*]}")" >> $GITHUB_OUTPUT
+            echo "email_pretty=$(printf "%s\n" "${changed_emails[@]}" | xargs -n 1 basename | paste -sd "," -)" >> $GITHUB_OUTPUT
           fi
-
-          # Find deleted email templates
-          DELETED_EMAILS=$(echo "$CHANGED_FILES" | grep '^D' | grep 'supabase/email_templates/.*\.html$' | sort -u | sed 's/^D\t//' || true)
-          if [ -n "$DELETED_EMAILS" ]; then
+          if [ ${#deleted_emails[@]} -gt 0 ]; then
             echo "email_deleted=true" >> $GITHUB_OUTPUT
-            DELETED_EMAIL_BASENAMES=$(echo "$DELETED_EMAILS" | xargs -n 1 basename | paste -sd "," -)
-            echo "email_to_delete=$DELETED_EMAIL_BASENAMES" >> $GITHUB_OUTPUT
+            echo "email_to_delete=$(printf "%s\n" "${deleted_emails[@]}" | xargs -n 1 basename | paste -sd "," -)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Deploy changed Edge Functions (Batch)
-        if: steps.deploy_prep.outputs.functions_changed == 'true'
+      - name: Deploy and Delete Edge Functions
+        if: steps.deploy_prep.outputs.functions_changed == 'true' || steps.deploy_prep.outputs.functions_deleted == 'true'
         run: |
-          echo "🚀 Deploying functions: ${{ steps.deploy_prep.outputs.functions_pretty }}"
-          # The `npx supabase functions deploy` command can handle a space-separated list of functions.
-          npx supabase functions deploy ${{ steps.deploy_prep.outputs.functions_list }} --project-ref $PROJECT_ID
-
-      - name: Delete removed Edge Functions
-        if: steps.deploy_prep.outputs.functions_deleted == 'true'
-        run: |
-          echo "🗑️ Deleting functions: ${{ steps.deploy_prep.outputs.functions_to_delete_pretty }}"
-          # `xargs` with `-n 1` is used to execute the delete command for each function name, which is safer than a direct loop.
-          echo "${{ steps.deploy_prep.outputs.functions_to_delete }}" | xargs -n 1 npx supabase functions delete --project-ref $PROJECT_ID
+          if [ "${{ steps.deploy_prep.outputs.functions_changed }}" == "true" ]; then
+            echo "🚀 Deploying functions: ${{ steps.deploy_prep.outputs.functions_pretty }}"
+            npx supabase functions deploy ${{ steps.deploy_prep.outputs.functions_list }} --project-ref $PROJECT_ID
+          fi
+          if [ "${{ steps.deploy_prep.outputs.functions_deleted }}" == "true" ]; then
+            echo "🗑️ Deleting functions: ${{ steps.deploy_prep.outputs.functions_to_delete_pretty }}"
+            echo "${{ steps.deploy_prep.outputs.functions_to_delete }}" | xargs -n 1 npx supabase functions delete --project-ref $PROJECT_ID
+          fi
 
       - name: Patch Auth Email Templates
-        id: patch_emails
         if: steps.deploy_prep.outputs.email_changed == 'true' || steps.deploy_prep.outputs.email_deleted == 'true'
         run: |
           set -euo pipefail
 
-          # Get the email map from the previous step's output.
-          EMAIL_MAP='${{ steps.deploy_prep.outputs.email_map }}'
           PAYLOAD_JSON='{}'
-
-          # Handle updates/additions
+          declare -A email_map=(
+            ["invite.html"]="mailer_templates_invite_content"
+            ["reset_password.html"]="mailer_templates_recovery_content"
+            ["confirm_signup.html"]="mailer_templates_confirmation_content"
+            ["magic_link.html"]="mailer_templates_magic_link_content"
+            ["change_email.html"]="mailer_templates_email_change_content"
+          )
+          declare -A default_content=(
+            ["invite.html"]="<h2>You have been invited</h2><p>You have been invited to create a user on {{ .SiteURL }}. Follow this link to accept the invite:</p><p><a href=\"{{ .ConfirmationURL }}\">Accept the invite</a></p>"
+            ["reset_password.html"]="<h2>Reset Password</h2><p>Follow this link to reset the password for your user:</p><p><a href=\"{{ .ConfirmationURL }}\">Reset Password</a></p>"
+            ["confirm_signup.html"]="<h2>Confirm your signup</h2><p>Follow this link to confirm your user:</p><p><a href=\"{{ .ConfirmationURL }}\">Confirm your email</a></p>"
+            ["magic_link.html"]="<h2>Magic Link</h2><p>Follow this link to login:</p><p><a href=\"{{ .ConfirmationURL }}\">Log In</a></p>"
+            ["change_email.html"]="<h2>Confirm email change</h2><p>Follow this link to confirm the update of your email:</p><p><a href=\"{{ .ConfirmationURL }}\">Change email</a></p>"
+          )
           if [ "${{ steps.deploy_prep.outputs.email_changed }}" == "true" ]; then
             echo "📩 Updating Auth email templates..."
-            # Use `jq` to build the JSON payload by iterating through the files.
-            for file_path in ${{ steps.deploy_prep.outputs.email_files }}; do
+            IFS=',' read -r -a changed_emails_array <<< "${{ steps.deploy_prep.outputs.email_files }}"
+            for file_path in "${changed_emails_array[@]}"; do
               filename=$(basename "$file_path")
-              key=$(echo "$EMAIL_MAP" | jq -r --arg filename "$filename" '.[$filename]')
-              if [ "$key" != "null" ]; then
+              key=${email_map["$filename"]}
+              if [ -n "$key" ]; then
                 content=$(cat "$file_path")
-                # Add the key-value pair to the payload using jq.
                 PAYLOAD_JSON=$(echo "$PAYLOAD_JSON" | jq --arg key "$key" --arg content "$content" '.[$key] = $content')
                 echo "Adding to payload: $filename"
               fi
             done
           fi
-
-          # Handle deletions
           if [ "${{ steps.deploy_prep.outputs.email_deleted }}" == "true" ]; then
             echo "🗑️ Restoring deleted Auth email templates from docs..."
-            DEFAULT_CONTENT=$(jq -nc '{"invite.html":"<h2>You have been invited</h2><p>You have been invited to create a user on {{ .SiteURL }}. Follow this link to accept the invite:</p><p><a href=\"{{ .ConfirmationURL }}\">Accept the invite</a></p>", "reset_password.html":"<h2>Reset Password</h2><p>Follow this link to reset the password for your user:</p><p><a href=\"{{ .ConfirmationURL }}\">Reset Password</a></p>", "confirm_signup.html":"<h2>Confirm your signup</h2><p>Follow this link to confirm your user:</p><p><a href=\"{{ .ConfirmationURL }}\">Confirm your email</a></p>", "magic_link.html":"<h2>Magic Link</h2><p>Follow this link to login:</p><p><a href=\"{{ .ConfirmationURL }}\">Log In</a></p>", "change_email.html":"<h2>Confirm email change</h2><p>Follow this link to confirm the update of your email:</p><p><a href=\"{{ .ConfirmationURL }}\">Change email</a></p>"}')
-            for filename in ${{ steps.deploy_prep.outputs.email_to_delete }}; do
-              key=$(echo "$EMAIL_MAP" | jq -r --arg filename "$filename" '.[$filename]')
-              content=$(echo "$DEFAULT_CONTENT" | jq -r --arg filename "$filename" '.[$filename]')
-              if [ "$key" != "null" ] && [ "$content" != "null" ]; then
-                # Add the key-value pair to the payload using jq.
+            IFS=',' read -r -a deleted_emails_array <<< "${{ steps.deploy_prep.outputs.email_to_delete }}"
+            for filename in "${deleted_emails_array[@]}"; do
+              key=${email_map["$filename"]}
+              content=${default_content["$filename"]}
+              if [ -n "$key" ] && [ -n "$content" ]; then
                 PAYLOAD_JSON=$(echo "$PAYLOAD_JSON" | jq --arg key "$key" --arg content "$content" '.[$key] = $content')
                 echo "Adding to payload: $filename"
               fi
             done
           fi
-
           if [ "$PAYLOAD_JSON" != "{}" ]; then
-            echo "📦 Final payload: $PAYLOAD_JSON"
+            echo "Final payload: $PAYLOAD_JSON"
             curl -s -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_ID/config/auth" \
               -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
               -H "Content-Type: application/json" \
@@ -166,9 +144,9 @@ jobs:
             echo "No email templates to patch."
           fi
 
-      - name: Deployment Summary & Slack Notification
+      - name: Deployment Summary
         if: always()
-        id: summary_slack
+        id: summary_prep
         run: |
           SUMMARY=""
           if [ "${{ steps.deploy_prep.outputs.functions_changed }}" == "true" ]; then
@@ -186,11 +164,8 @@ jobs:
           if [ -z "$SUMMARY" ]; then
             SUMMARY="- No changes detected. No deployments were necessary."
           fi
-
           echo "## 🚀 Supabase Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo -e "$SUMMARY" >> $GITHUB_STEP_SUMMARY
-
-          # Direct assignment of summary to output
           echo "slack_text=$SUMMARY" >> $GITHUB_OUTPUT
 
       - name: Slack Notification
@@ -226,7 +201,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "${{ steps.summary_slack.outputs.slack_text }}"
+                    "text": "${{ steps.summary_prep.outputs.slack_text }}"
                   }
                 }
               ]
