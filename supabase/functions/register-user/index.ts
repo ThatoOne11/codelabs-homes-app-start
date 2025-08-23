@@ -122,13 +122,13 @@ async function RegisterUser(
       registrationErrors.push(
         `Error checking if user exists: ${userInput.email}`,
       );
-      return;
+      return; // stop processing this user
     }
 
     if (existingUser) {
       console.log(`User already exists: ${userInput.email}`);
       registrationErrors.push(`User already exists: ${userInput.email}`);
-      return;
+      return; // stop processing this user
     }
 
     const roleId = await userClient

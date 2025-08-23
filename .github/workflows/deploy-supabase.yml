@@ -16,38 +16,33 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
     steps:
-      # ----------------------------
-      # Checkout repo
-      # ----------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # ----------------------------
-      # Setup Node.js
-      # ----------------------------
-      - name: Setup Node.js
+      - name: Setup Node.js and jq
         uses: actions/setup-node@v4
         with:
           node-version: 18
+      - run: sudo apt-get update && sudo apt-get install -y jq
 
-      # ----------------------------
-      # Determine Git Range and Changed Files
-      # ----------------------------
-      - name: Determine Git Range and Changed Files
-        id: git_changes
+      - name: Detect and Prepare Deployments
+        id: deploy_prep
         run: |
           set -euo pipefail
 
-          # Determine the Git diff range based on event type and optional input
-          RANGE=""
-          if [ "${{ github.event.inputs.commit_sha }}" != "" ]; then
+          # Determine commit range based on trigger
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.commit_sha }}" ]; then
             RANGE="${{ github.event.inputs.commit_sha }}^..${{ github.event.inputs.commit_sha }}"
             echo "Using specified commit SHA: ${{ github.event.inputs.commit_sha }}"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             RANGE="HEAD^..HEAD"
             echo "Manual run, using latest commit range: $RANGE"
           else
@@ -55,78 +50,36 @@ jobs:
             echo "Push event, using range: $RANGE"
           fi
 
-          # Get all changed files within the determined range and save them to an output
           CHANGED_FILES=$(git diff --name-only "$RANGE" || true)
-          echo "changed_files=$(echo "$CHANGED_FILES" | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
           echo "Determined git diff range: $RANGE"
 
-      # ----------------------------
-      # Detect changed edge functions
-      # ----------------------------
-      - name: Detect changed functions
-        id: functions
-        run: |
-          CHANGED_FUNCS=$(echo "${{ steps.git_changes.outputs.changed_files }}" | tr ' ' '\n' | grep '^supabase/functions/' | cut -d'/' -f3 | uniq || true)
-          VALID_FUNCS=()
-          if [ -n "$CHANGED_FUNCS" ]; then
-            while IFS= read -r fn; do
-              if [[ "$fn" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]]; then
-                VALID_FUNCS+=("$fn")
-              else
-                echo "⚠️ Skipping invalid function folder: $fn"
-              fi
-            done <<< "$CHANGED_FUNCS"
-          fi
-          if [ ${#VALID_FUNCS[@]} -gt 0 ]; then
-            FUNCS_SPACE="${VALID_FUNCS[*]}"
-            FUNCS_COMMA=$(IFS=, ; echo "${VALID_FUNCS[*]}")
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "files=$FUNCS_SPACE" >> $GITHUB_OUTPUT
-            echo "files_pretty=$FUNCS_COMMA" >> $GITHUB_OUTPUT
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
+          # Detect changed functions
+          FUNCS_TO_DEPLOY=$(echo "$CHANGED_FILES" | grep '^supabase/functions/' | cut -d'/' -f3 | sort -u | grep -E '^[a-zA-Z][a-zA-Z0-9_-]*$' || true)
+          if [ -n "$FUNCS_TO_DEPLOY" ]; then
+            echo "functions_changed=true" >> $GITHUB_OUTPUT
+            echo "functions_list=$(echo "$FUNCS_TO_DEPLOY" | tr '\n' ' ')" >> $GITHUB_OUTPUT
+            echo "functions_pretty=$(echo "$FUNCS_TO_DEPLOY" | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
           fi
 
-      # ----------------------------
-      # Detect changed email templates
-      # ----------------------------
-      - name: Detect changed email templates
-        id: email
-        run: |
-          CHANGED_EMAIL_PATHS_RAW=$(echo "${{ steps.git_changes.outputs.changed_files }}" | tr ' ' '\n' | grep '^supabase/email_templates/.*\.html$' || true)
-          if [ -n "$CHANGED_EMAIL_PATHS_RAW" ]; then
-            CHANGED_EMAIL_PATHS=$(echo "$CHANGED_EMAIL_PATHS_RAW" | paste -sd "," -)
-            CHANGED_EMAIL_BASENAMES=$(echo "$CHANGED_EMAIL_PATHS_RAW" | xargs -n 1 basename | paste -sd "," -)
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "files=$CHANGED_EMAIL_PATHS" >> $GITHUB_OUTPUT
-            echo "files_pretty=$CHANGED_EMAIL_BASENAMES" >> $GITHUB_OUTPUT
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
+          # Detect changed email templates
+          CHANGED_EMAILS_RAW=$(echo "$CHANGED_FILES" | grep '^supabase/email_templates/.*\.html$' | sort -u || true)
+          if [ -n "$CHANGED_EMAILS_RAW" ]; then
+            CHANGED_EMAIL_PATHS=$(echo "$CHANGED_EMAILS_RAW" | paste -sd "," -)
+            CHANGED_EMAIL_BASENAMES=$(echo "$CHANGED_EMAILS_RAW" | xargs -n 1 basename | paste -sd "," -)
+            echo "email_changed=true" >> $GITHUB_OUTPUT
+            echo "email_files=$CHANGED_EMAIL_PATHS" >> $GITHUB_OUTPUT
+            echo "email_pretty=$CHANGED_EMAIL_BASENAMES" >> $GITHUB_OUTPUT
           fi
 
-      # ----------------------------
-      # Deploy changed Edge Functions
-      # ----------------------------
-      - name: Deploy changed Edge Functions
-        if: steps.functions.outputs.changed == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      - name: Deploy changed Edge Functions (Batch)
+        if: steps.deploy_prep.outputs.functions_changed == 'true'
         run: |
-          echo "Functions to deploy: ${{ steps.functions.outputs.files_pretty }}"
-          for fn in ${{ steps.functions.outputs.files }}; do
-            echo "🚀 Deploying function: $fn"
-            npx supabase functions deploy "$fn" --project-ref $PROJECT_ID
-          done
+          FUNCS=${{ steps.deploy_prep.outputs.functions_list }}
+          echo "🚀 Deploying functions: $(echo "$FUNCS" | tr ' ' ',')"
+          npx supabase functions deploy $FUNCS --project-ref $PROJECT_ID
 
-      # ----------------------------
-      # Sync Auth Email Templates
-      # ----------------------------
       - name: Sync Auth Email Templates
-        if: steps.email.outputs.changed == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        if: steps.deploy_prep.outputs.email_changed == 'true'
         run: |
           echo "📩 Updating Auth email templates..."
           declare -A TEMPLATE_KEYS
@@ -137,7 +90,7 @@ jobs:
           TEMPLATE_KEYS["change_email.html"]="mailer_templates_email_change_content"
 
           PAYLOAD="{"
-          IFS=',' read -ra FILES <<< "${{ steps.email.outputs.files }}"
+          IFS=',' read -ra FILES <<< "${{ steps.deploy_prep.outputs.email_files }}"
           for file_path in "${FILES[@]}"; do
             filename=$(basename "$file_path")
             key=${TEMPLATE_KEYS[$filename]}
@@ -149,27 +102,73 @@ jobs:
             fi
           done
           PAYLOAD="${PAYLOAD%,}}"
+
           curl -s -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_ID/config/auth" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"
           echo "✅ Auth email templates updated successfully."
 
-      # ----------------------------
-      # Job Summary
-      # ----------------------------
-      - name: Deployment Summary
+      - name: Deployment Summary & Slack Notification
         if: always()
+        id: summary_slack
         run: |
-          if [ "${{ steps.functions.outputs.changed }}" == "false" ] && [ "${{ steps.email.outputs.changed }}" == "false" ]; then
-            echo "## 🚀 Supabase Deployment Summary" >> $GITHUB_STEP_SUMMARY
-            echo "- No changes detected. No deployments were necessary." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## 🚀 Supabase Deployment Summary" >> $GITHUB_STEP_SUMMARY
-            if [ "${{ steps.functions.outputs.changed }}" == "true" ]; then
-              echo "- Functions deployed: \`${{ steps.functions.outputs.files_pretty }}\`" >> $GITHUB_STEP_SUMMARY
-            fi
-            if [ "${{ steps.email.outputs.changed }}" == "true" ]; then
-              echo "- Email templates deployed: \`${{ steps.email.outputs.files_pretty }}\`" >> $GITHUB_STEP_SUMMARY
-            fi
+          SUMMARY=""
+          if [ "${{ steps.deploy_prep.outputs.functions_changed }}" == "true" ]; then
+            SUMMARY+="- Functions deployed: \`${{ steps.deploy_prep.outputs.functions_pretty }}\`\n"
           fi
+          if [ "${{ steps.deploy_prep.outputs.email_changed }}" == "true" ]; then
+            SUMMARY+="- Email templates deployed: \`${{ steps.deploy_prep.outputs.email_pretty }}\`\n"
+          fi
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="- No changes detected. No deployments were necessary."
+          fi
+
+          # Write to GitHub Summary
+          echo "## 🚀 Supabase Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo -e "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+
+          # Set Slack message output
+          delimiter="$(openssl rand -hex 8)"
+          echo "slack_text<<$delimiter" >> $GITHUB_OUTPUT
+          echo "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
+
+      - name: Slack Notification
+        uses: slackapi/slack-github-action@v2.1.1
+        if: always()
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          method: chat.postMessage
+          payload-templated: true
+          payload: |
+            {
+              "channel": "U093TBG6FST",
+              "text": "Deployment Status: ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Deployment Status: ${{ job.status }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Workflow: *${{ github.workflow }}*\nBranch: *${{ github.ref_name }}*\nCommit: `${{ github.sha }}`\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ steps.summary_slack.outputs.slack_text }}"
+                  }
+                }
+              ]
+            }
