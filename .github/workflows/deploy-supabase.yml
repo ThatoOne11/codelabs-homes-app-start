@@ -8,6 +8,10 @@ on:
       - "supabase/functions/**"
       - "supabase/email_templates/**"
   workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Optional: specify a commit SHA to deploy"
+        default: ""
 
 jobs:
   deploy:
@@ -36,7 +40,9 @@ jobs:
       - name: Determine git diff range
         id: git_range
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event.inputs.commit_sha }}" != "" ]; then
+            RANGE="${{ github.event.inputs.commit_sha }}^..${{ github.event.inputs.commit_sha }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             RANGE="HEAD"
             if git rev-parse HEAD^ >/dev/null 2>&1; then
               RANGE="HEAD^..HEAD"
@@ -46,6 +52,7 @@ jobs:
           fi
           echo "range=$RANGE" >> $GITHUB_OUTPUT
           echo "Determined git diff range: $RANGE"
+
       # ----------------------------
       # Detect changed edge functions
       # ----------------------------
@@ -53,24 +60,31 @@ jobs:
         id: changes
         run: |
           CHANGED_FUNCS=$(git diff --name-only ${{ steps.git_range.outputs.range }} | grep '^supabase/functions/' | cut -d'/' -f3 | uniq || true)
+
+          VALID_FUNCS=()
           if [ -n "$CHANGED_FUNCS" ]; then
-            echo "🚀 Detected changed functions: $CHANGED_FUNCS"
+            while IFS= read -r fn; do
+              if [[ "$fn" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]]; then
+                VALID_FUNCS+=("$fn")
+              else
+                echo "⚠️ Skipping invalid function folder: $fn"
+              fi
+            done <<< "$CHANGED_FUNCS"
+          fi
+
+          if [ ${#VALID_FUNCS[@]} -gt 0 ]; then
+            FUNCS_SPACE="${VALID_FUNCS[*]}"
+            FUNCS_COMMA=$(IFS=, ; echo "${VALID_FUNCS[*]}")
             echo "changed=true" >> $GITHUB_OUTPUT
-            echo "files=$CHANGED_FUNCS" >> $GITHUB_OUTPUT
-          elif [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            ALL_FUNCS=$(ls supabase/functions/ 2>/dev/null)
-            if [ -n "$ALL_FUNCS" ]; then
-              echo "🔄 Manual trigger: redeploying all functions: $ALL_FUNCS"
-              echo "changed=true" >> $GITHUB_OUTPUT
-              echo "files=$ALL_FUNCS" >> $GITHUB_OUTPUT
-            else
-              echo "⚠️ No edge functions found to deploy."
-              echo "changed=false" >> $GITHUB_OUTPUT
-            fi
+            echo "files=$FUNCS_SPACE" >> $GITHUB_OUTPUT
+            echo "files_pretty=$FUNCS_COMMA" >> $GITHUB_OUTPUT
           else
-            echo "⚠️ No edge functions changed."
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
+
+      # ----------------------------
+      # Deploy changed Edge Functions
+      # ----------------------------
       - name: Deploy changed Edge Functions
         if: steps.changes.outputs.changed == 'true'
         env:
@@ -82,32 +96,24 @@ jobs:
             echo "🚀 Deploying function: $fn"
             npx supabase functions deploy "$fn" --project-ref $PROJECT_ID
           done
+
       # ----------------------------
       # Detect changed email templates
       # ----------------------------
       - name: Check if email templates changed
         id: email
         run: |
-          CHANGED_TEMPLATES=$(git diff --name-only ${{ steps.git_range.outputs.range }} | grep '^supabase/email_templates/.*\.html$' || true)
-          if [ -n "$CHANGED_TEMPLATES" ]; then
-            echo "📩 Detected changed templates: $CHANGED_TEMPLATES"
-            CHANGED_TEMPLATES_SAFE=$(echo "$CHANGED_TEMPLATES" | paste -sd "," -)
+          CHANGED_TEMPLATES_WITH_PATH=$(git diff --name-only ${{ steps.git_range.outputs.range }} | grep '^supabase/email_templates/.*\.html$' || true)
+          if [ -n "$CHANGED_TEMPLATES_WITH_PATH" ]; then
+            CHANGED_TEMPLATES_SAFE=$(echo "$CHANGED_TEMPLATES_WITH_PATH" | paste -sd "," -)
+            CHANGED_TEMPLATES_BASENAMES=$(echo "$CHANGED_TEMPLATES_WITH_PATH" | xargs -n 1 basename | paste -sd "," -)
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "files=$CHANGED_TEMPLATES_SAFE" >> $GITHUB_OUTPUT
-          elif [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            ALL_TEMPLATES=$(ls supabase/email_templates/*.html 2>/dev/null | paste -sd "," -)
-            if [ -n "$ALL_TEMPLATES" ]; then
-              echo "🔄 Manual trigger: redeploying all templates: $ALL_TEMPLATES"
-              echo "changed=true" >> $GITHUB_OUTPUT
-              echo "files=$ALL_TEMPLATES" >> $GITHUB_OUTPUT
-            else
-              echo "⚠️ No email templates found to deploy."
-              echo "changed=false" >> $GITHUB_OUTPUT
-            fi
+            echo "files_pretty=$CHANGED_TEMPLATES_BASENAMES" >> $GITHUB_OUTPUT
           else
-            echo "⚠️ No email templates changed."
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
+
       # ----------------------------
       # Skip deploy if no changes detected
       # ----------------------------
@@ -117,6 +123,7 @@ jobs:
             echo "⚠️ No changes detected. Skipping all deployments."
             exit 0
           fi
+
       # ----------------------------
       # Update Supabase Auth Email Templates
       # ----------------------------
@@ -124,7 +131,7 @@ jobs:
         if: steps.email.outputs.changed == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
           echo "📩 Updating Auth email templates..."
           declare -A TEMPLATE_KEYS
@@ -133,21 +140,39 @@ jobs:
           TEMPLATE_KEYS["confirm_signup.html"]="mailer_templates_confirmation_content"
           TEMPLATE_KEYS["magic_link.html"]="mailer_templates_magic_link_content"
           TEMPLATE_KEYS["change_email.html"]="mailer_templates_email_change_content"
+
           PAYLOAD="{"
           IFS=',' read -ra FILES <<< "${{ steps.email.outputs.files }}"
-          for file in "${FILES[@]}"; do
-            filename=$(basename "$file")
+          for file_path in "${FILES[@]}"; do
+            filename=$(basename "$file_path")
             key=${TEMPLATE_KEYS[$filename]}
             if [ -n "$key" ]; then
-              content=$(< "$file")
+              content=$(< "$file_path")
               content_json=$(jq -Rn --arg str "$content" '$str')
               PAYLOAD="$PAYLOAD\"$key\":$content_json,"
               echo "Deploying template: $filename"
             fi
           done
           PAYLOAD="${PAYLOAD%,}}"
-          curl -s -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth" \
+          curl -s -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_ID/config/auth" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"
           echo "✅ Auth email templates updated successfully."
+
+      # ----------------------------
+      # Job Summary
+      # ----------------------------
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 Supabase Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.changes.outputs.changed }}" == "true" ]; then
+            echo "- Functions deployed: \`${{ steps.changes.outputs.files_pretty }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ steps.email.outputs.changed }}" == "true" ]; then
+            echo "- Email templates deployed: \`${{ steps.email.outputs.files_pretty }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ steps.changes.outputs.changed }}" != "true" ] && [ "${{ steps.email.outputs.changed }}" != "true" ]; then
+            echo "- No changes detected. No deployments were necessary." >> $GITHUB_STEP_SUMMARY
+          fi
