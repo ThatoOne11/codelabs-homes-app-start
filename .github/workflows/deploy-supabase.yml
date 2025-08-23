@@ -82,8 +82,7 @@ jobs:
             echo "email_pretty=$CHANGED_EMAIL_BASENAMES" >> $GITHUB_OUTPUT
           fi
 
-          # Detect templates to delete. This is a special case as we don't 'delete' them
-          # but rather overwrite with an empty string or a generic template.
+          # Detect templates to delete.
           DELETED_EMAILS_RAW=$(echo "$CHANGED_FILES" | grep '^D' | grep 'supabase/email_templates/.*\.html$' | sort -u || true)
           if [ -n "$DELETED_EMAILS_RAW" ]; then
             DELETED_EMAIL_BASENAMES=$(echo "$DELETED_EMAILS_RAW" | sed 's/^D\t//' | xargs -n 1 basename | paste -sd "," -)
@@ -141,7 +140,14 @@ jobs:
       - name: Handle Deleted Auth Email Templates
         if: steps.deploy_prep.outputs.email_deleted == 'true'
         run: |
-          echo "🗑️ Resetting deleted Auth email templates..."
+          echo "🗑️ Restoring deleted Auth email templates from docs..."
+          declare -A TEMPLATE_CONTENT
+          TEMPLATE_CONTENT["invite.html"]='<h2>You have been invited</h2><p>You have been invited to create a user on {{ .SiteURL }}. Follow this link to accept the invite:</p><p><a href="{{ .ConfirmationURL }}">Accept the invite</a></p>'
+          TEMPLATE_CONTENT["reset_password.html"]='<h2>Reset Password</h2><p>Follow this link to reset the password for your user:</p><p><a href="{{ .ConfirmationURL }}">Reset Password</a></p>'
+          TEMPLATE_CONTENT["confirm_signup.html"]='<h2>Confirm your signup</h2><p>Follow this link to confirm your user:</p><p><a href="{{ .ConfirmationURL }}">Confirm your email</a></p>'
+          TEMPLATE_CONTENT["magic_link.html"]='<h2>Magic Link</h2><p>Follow this link to login:</p><p><a href="{{ .ConfirmationURL }}">Log In</a></p>'
+          TEMPLATE_CONTENT["change_email.html"]='<h2>Confirm email change</h2><p>Follow this link to confirm the update of your email:</p><p><a href="{{ .ConfirmationURL }}">Change email</a></p>'
+
           declare -A TEMPLATE_KEYS
           TEMPLATE_KEYS["invite.html"]="mailer_templates_invite_content"
           TEMPLATE_KEYS["reset_password.html"]="mailer_templates_recovery_content"
@@ -153,10 +159,11 @@ jobs:
           IFS=',' read -ra FILES <<< "${{ steps.deploy_prep.outputs.email_to_delete }}"
           for filename in "${FILES[@]}"; do
             key=${TEMPLATE_KEYS[$filename]}
-            if [ -n "$key" ]; then
-              # Overwrite with empty content, which effectively "resets" it
-              PAYLOAD="$PAYLOAD\"$key\":\"\","
-              echo "Resetting template: $filename"
+            content=${TEMPLATE_CONTENT[$filename]}
+            if [ -n "$key" ] && [ -n "$content" ]; then
+              content_json=$(jq -Rn --arg str "$content" '$str')
+              PAYLOAD="$PAYLOAD\"$key\":$content_json,"
+              echo "Restoring template: $filename"
             fi
           done
           PAYLOAD="${PAYLOAD%,}}"
@@ -165,7 +172,7 @@ jobs:
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"
-          echo "✅ Deleted Auth email templates were reset."
+          echo "✅ Deleted Auth email templates were restored to docs version."
 
       - name: Deployment Summary & Slack Notification
         if: always()
@@ -176,14 +183,13 @@ jobs:
             SUMMARY+="- Functions deployed: \`${{ steps.deploy_prep.outputs.functions_pretty }}\`\n"
           fi
           if [ "${{ steps.deploy_prep.outputs.functions_deleted }}" == "true" ]; then
-            # Corrected line: use the new 'functions_to_delete_pretty' output
             SUMMARY+="- Functions deleted: \`${{ steps.deploy_prep.outputs.functions_to_delete_pretty }}\`\n"
           fi
           if [ "${{ steps.deploy_prep.outputs.email_changed }}" == "true" ]; then
             SUMMARY+="- Email templates updated: \`${{ steps.deploy_prep.outputs.email_pretty }}\`\n"
           fi
           if [ "${{ steps.deploy_prep.outputs.email_deleted }}" == "true" ]; then
-            SUMMARY+="- Email templates reset: \`${{ steps.deploy_prep.outputs.email_to_delete }}\`\n"
+            SUMMARY+="- Email templates deleted and reset: \`${{ steps.deploy_prep.outputs.email_to_delete }}\`\n"
           fi
           if [ -z "$SUMMARY" ]; then
             SUMMARY="- No changes detected. No deployments were necessary."
