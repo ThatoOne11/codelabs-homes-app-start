@@ -177,7 +177,7 @@ jobs:
           payload-templated: true
           payload: |
             {
-              "channel": "U093TBG6FST",
+              "channel": "C09FJTNSAB0",
               "text": "Deployment Status: ${{ job.status }}",
               "blocks": [
                 {
