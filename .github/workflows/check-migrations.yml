@@ -1,4 +1,4 @@
-name: Check Supabase Migrations Are Up To Date
+name: Check Supabase Migrations
 
 on:
   pull_request:

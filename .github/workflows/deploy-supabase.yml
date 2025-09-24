@@ -1,4 +1,4 @@
-name: Deploy Supabase Functions & Auth Email Templates
+name: Deploy Supabase Functions & Emails
 
 on:
   push:
