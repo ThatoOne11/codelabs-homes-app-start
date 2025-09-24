@@ -1,0 +1,33 @@
+name: Check Supabase Migrations Are Up To Date
+
+on:
+  pull_request:
+    branches: [main] # run whenever a PR targets main
+
+jobs:
+  check-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # we need history to compare
+      - name: Verify migrations are latest
+        run: |
+          git fetch origin main
+
+          # Get newest timestamped migration file on main
+          LATEST_DEV=$(git show origin/main:supabase/migrations \
+                        | grep -Eo '^[0-9]{14}' | sort -r | head -1)
+
+          # Get newest migration file on this PR branch
+          LATEST_PR=$(ls supabase/migrations \
+                        | grep -Eo '^[0-9]{14}' | sort -r | head -1 || echo "")
+
+          echo "Latest migration on main: $LATEST_DEV"
+          echo "Latest migration on this branch: $LATEST_PR"
+
+          if [ -n "$LATEST_DEV" ] && [ "$LATEST_DEV" \> "$LATEST_PR" ]; then
+            echo "❌ Your branch is missing newer migrations from main."
+            echo "   Please pull/rebase main and regenerate migrations."
+            exit 1
+          fi
