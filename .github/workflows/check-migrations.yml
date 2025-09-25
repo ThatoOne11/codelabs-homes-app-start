@@ -1,4 +1,4 @@
-name: Check Supabase Migrations
+name: "PR: Check Supabase Migration Order"
 
 on:
   pull_request:
@@ -22,10 +22,9 @@ jobs:
           # The target branch (e.g., 'develop' or 'main')
           TARGET_BRANCH="origin/${{ github.base_ref }}"
 
-          # Find the timestamp of the latest migration in the target branch.
-          # We list files, sort them descending, take the first one, and extract the timestamp prefix.
-          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations | grep -E '^[0-9]+' | sort -r | head -n 1 | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
-
+          # This correctly finds the latest migration file and extracts its timestamp.
+          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations | sort -r | head -n 1 | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
+          
           echo "Latest migration timestamp on '${TARGET_BRANCH}' is: ${LATEST_TARGET_MIGRATION_TS}"
 
           # Find any new migration files added in this PR (status 'A' for Added).
@@ -38,7 +37,7 @@ jobs:
           fi
 
           echo "Found ${#NEW_MIGRATIONS[@]} new migration(s) to check..."
-
+          
           HAS_ERROR=false
           for file in "${NEW_MIGRATIONS[@]}"; do
             PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
