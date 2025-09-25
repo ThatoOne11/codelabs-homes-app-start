@@ -1,26 +1,26 @@
 name: "PR: Check Supabase Migration Order"
 
+# Use pull_request_target to get write permissions for PRs from forks.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
     paths:
       - "supabase/migrations/**"
 
 jobs:
+  # This job checks the code and prepares a summary.
   check-migration-timestamp:
     runs-on: ubuntu-latest
-    # Grant permissions to write comments on the pull request.
-    permissions:
-      pull-requests: write
     outputs:
       summary_title: ${{ steps.check.outputs.summary_title }}
       summary_body: ${{ steps.check.outputs.summary_body }}
-      job_conclusion: ${{ steps.check.outputs.conclusion }}
 
     steps:
+      # Securely check out the code from the PR's head commit.
       - name: Checkout PR code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Verify Migration Timestamp & Prepare Summary
@@ -28,12 +28,13 @@ jobs:
         run: |
           set -euo pipefail
           TARGET_BRANCH="origin/${{ github.base_ref }}"
+          
+          # This corrected command accurately finds the latest migration timestamp.
           LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations | sort -r | head -n 1 | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
           
           mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD | grep 'supabase/migrations/' || true)
 
           if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
-            echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check" >> "$GITHUB_OUTPUT"
             echo "summary_body=No new migrations detected." >> "$GITHUB_OUTPUT"
             exit 0
@@ -50,22 +51,29 @@ jobs:
           done
 
           if [ "$HAS_ERROR" = true ]; then
-            echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
-            SUMMARY_BODY="One or more migration files have outdated timestamps.<br><br>${ERROR_DETAILS}<br>👉 **To fix:** Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp."
+            # Using a heredoc for cleaner multi-line strings
+            SUMMARY_BODY=$(cat <<EOF
+          One or more migration files have outdated timestamps.<br><br>
+          ${ERROR_DETAILS}<br>
+          👉 **To fix:** Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
+          EOF
+          )
             echo "summary_body=$SUMMARY_BODY" >> "$GITHUB_OUTPUT"
             exit 1
           else
-            echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
             echo "summary_body=All new migration timestamps are valid." >> "$GITHUB_OUTPUT"
           fi
 
+  # This job posts the summary comment to the PR.
   post-summary:
     runs-on: ubuntu-latest
-    # This job needs the output from the check job.
     needs: [check-migration-timestamp]
-    # Always run this step to post a summary, regardless of success or failure.
+    # Grant this job permission to write comments.
+    permissions:
+      pull-requests: write
+    # Always run this job to post the result, even if the check failed.
     if: always()
 
     steps:
@@ -73,8 +81,6 @@ jobs:
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          # This unique ID helps the action find and update its own comment.
-          comment-id: ${{ needs.check-migration-timestamp.outputs.comment_id }}
           body: |
             ### ${{ needs.check-migration-timestamp.outputs.summary_title }}
             ${{ needs.check-migration-timestamp.outputs.summary_body }}
