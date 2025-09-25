@@ -44,8 +44,11 @@ jobs:
             PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              # CORRECTED LINE: Use $'' to ensure \n is interpreted as a newline.
-              ERROR_DETAILS+=$'**File:** `${file}`\n**Problem:** Timestamp ('${PR_MIGRATION_TS}') is not newer than the latest in `${{ github.base_ref }}` ('${LATEST_TARGET_MIGRATION_TS}').\n'
+              # FINAL FIX: Use printf for safe, reliable string formatting.
+              # This correctly expands all variables and uses <br> for line breaks.
+              line=$(printf "**File:** \`%s\`<br>**Problem:** Timestamp (%s) is not newer than the latest in \`%s\` (%s)." \
+                "$file" "$PR_MIGRATION_TS" "${{ github.base_ref }}" "$LATEST_TARGET_MIGRATION_TS")
+              ERROR_DETAILS+="$line<br><br>"
             fi
           done
 
@@ -53,7 +56,7 @@ jobs:
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
             SUMMARY_BODY=$(cat <<EOF
           One or more migration files have outdated timestamps.<br><br>
-          ${ERROR_DETAILS}<br>
+          ${ERROR_DETAILS}
           👉 **To fix:** Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
           EOF
           )
