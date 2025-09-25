@@ -7,12 +7,11 @@ on:
       - "supabase/migrations/**"
 
 jobs:
-  check-migration-timestamp:
+  check_and_summarize:
     runs-on: ubuntu-latest
-    outputs:
-      summary_title: ${{ steps.check.outputs.summary_title }}
-      summary_body: ${{ steps.check.outputs.summary_body }}
-
+    permissions:
+      pull-requests: write
+    
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
@@ -31,6 +30,7 @@ jobs:
           mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD | grep 'supabase/migrations/' || true)
 
           if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check" >> "$GITHUB_OUTPUT"
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "No new migrations detected." >> "$GITHUB_OUTPUT"
@@ -51,6 +51,7 @@ jobs:
           done
 
           if [ "$HAS_ERROR" = true ]; then
+            echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
             SUMMARY_BODY=$(cat <<EOF
           One or more of your migration files have outdated timestamps.<br>
@@ -61,26 +62,24 @@ jobs:
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "$SUMMARY_BODY" >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
-            exit 1
           else
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "All new migration timestamps are valid." >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
-  post-summary:
-    runs-on: ubuntu-latest
-    needs: [check-migration-timestamp]
-    permissions:
-      pull-requests: write
-    if: always()
-
-    steps:
       - name: Create or Update PR Comment
+        if: always()
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            ### ${{ needs.check-migration-timestamp.outputs.summary_title }}
-            ${{ needs.check-migration-timestamp.outputs.summary_body }}
+            ### ${{ steps.check.outputs.summary_title }}
+            ${{ steps.check.outputs.summary_body }}
+
+      - name: Report Final Status
+        # This final step fails the job if the 'check' step determined a failure.
+        if: steps.check.outputs.conclusion == 'failure'
+        run: exit 1
