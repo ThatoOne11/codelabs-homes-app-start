@@ -38,30 +38,27 @@ jobs:
             exit 0
           fi
 
-          FILE_LIST_DETAILS_MD=""
-          ERROR_COUNT=0
+          ERROR_DETAILS=""
+          HAS_ERROR=false
           for file in "${NEW_MIGRATIONS[@]}"; do
             PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
-              ((ERROR_COUNT++))
-              # Build the exact markdown line you want for each file
-              line=$(printf -- "- \`%s\` (Timestamp: \`%s\`)\\n" "$file" "$PR_MIGRATION_TS")
-              FILE_LIST_DETAILS_MD+="$line"
+              HAS_ERROR=true
+              line=$(printf "**File:** \`%s\`<br>**Problem:** Timestamp (%s) is not newer than the latest in \`%s\` (%s)." \
+                "$file" "$PR_MIGRATION_TS" "${{ github.base_ref }}" "$LATEST_TARGET_MIGRATION_TS")
+              ERROR_DETAILS+="$line<br>"
             fi
           done
 
-          if [ "$ERROR_COUNT" -gt 0 ]; then
+          if [ "$HAS_ERROR" = true ]; then
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
-            
             SUMMARY_BODY=$(cat <<EOF
-            One or more of your migration files have outdated timestamps.
-            The following files have timestamps that are not newer than the latest in \`${{ github.base_ref }}\` (\`${LATEST_TARGET_MIGRATION_TS}\`):
-
-            ${FILE_LIST_DETAILS_MD}
-            👉 **To fix:** Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
-            EOF
-            )
+          One or more of your migration files have outdated timestamps.<br>
+          ${ERROR_DETAILS}
+          👉 **To fix:** Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
+          EOF
+          )
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "$SUMMARY_BODY" >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
@@ -73,6 +70,7 @@ jobs:
             echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
+      #Find the bot's previous comment on the PR.
       - name: Find Comment
         if: always()
         uses: peter-evans/find-comment@v3
@@ -86,8 +84,10 @@ jobs:
         if: always()
         uses: peter-evans/create-or-update-comment@v4
         with:
+          #Pass the found comment's ID to the action.
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
+          # Action to replace the comment's content.
           edit-mode: replace
           body: |
             ### ${{ steps.check.outputs.summary_title }}
