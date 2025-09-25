@@ -57,12 +57,12 @@ jobs:
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
             SUMMARY_BODY=$(cat <<EOF
-          One or more of your migration files have outdated timestamps.
-          
-          ${ERROR_DETAILS}
-          👉 **To fix:** Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
-          EOF
-          )
+One or more of your migration files have outdated timestamps.
+
+${ERROR_DETAILS}
+👉 **To fix:** Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
+EOF
+)
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "$SUMMARY_BODY" >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
