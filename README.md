@@ -1,8 +1,7 @@
 # Angular Homes App
 
 [![Check Supabase Migrations](https://github.com/ThatoOne11/codelabs-homes-app-start/actions/workflows/check-migrations.yml/badge.svg)](https://github.com/ThatoOne11/codelabs-homes-app-start/actions/workflows/check-migrations.yml)
-[![Deploy Supabase Functions & Auth Email Templates](https://github.com/ThatoOne11/codelabs-homes-app-start/actions/workflows/deploy-supabase.yml/badge.svg)](https://github.com/ThatoOne11/codelabs-homes-app-start/actions/workflows/deploy-supabase.yml)  
-
+[![Deploy Supabase Functions & Auth Email Templates](https://github.com/ThatoOne11/codelabs-homes-app-start/actions/workflows/deploy-supabase.yml/badge.svg)](https://github.com/ThatoOne11/codelabs-homes-app-start/actions/workflows/deploy-supabase.yml)
 
 - Install Angular if you don't have it installed
 
@@ -18,8 +17,8 @@
 
 - Install the depencies
 
-  `npm install` 
+  `npm install`
 
-- Run the application 
+- Run the application
 
   `ng serve`
