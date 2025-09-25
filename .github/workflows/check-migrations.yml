@@ -66,20 +66,33 @@ jobs:
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "All new migration timestamps are valid." >> "$GITHUB_OUTPUT"
+            echo "No timestamp conflicts were found. The migration order is valid and ready for merge." >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
           fi
+
+      #Find the bot's previous comment on the PR.
+      - name: Find Comment
+        if: always()
+        uses: peter-evans/find-comment@v3
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: Supabase Migration Check
 
       - name: Create or Update PR Comment
         if: always()
         uses: peter-evans/create-or-update-comment@v4
         with:
+          #Pass the found comment's ID to the action.
+          comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
+          # Action to replace the comment's content.
+          edit-mode: replace
           body: |
             ### ${{ steps.check.outputs.summary_title }}
             ${{ steps.check.outputs.summary_body }}
 
       - name: Report Final Status
-        # This final step fails the job if the 'check' step determined a failure.
         if: steps.check.outputs.conclusion == 'failure'
         run: exit 1
