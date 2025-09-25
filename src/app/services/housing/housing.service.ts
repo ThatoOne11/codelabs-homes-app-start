@@ -29,6 +29,7 @@ export class HousingService {
 
   // Method to get a housing location by ID
   // This method is used in HousingLocationCardComponent to fetch details of a specific location
+  // It returns a single HousingLocation object or undefined if not found
   async getHousingLocationById(
     id: number,
   ): Promise<HousingLocation | undefined> {
