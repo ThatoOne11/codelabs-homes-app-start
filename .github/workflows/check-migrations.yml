@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-    
+
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
@@ -24,10 +24,13 @@ jobs:
         run: |
           set -euo pipefail
           TARGET_BRANCH="origin/${{ github.base_ref }}"
-          
-          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations | sort -r | head -n 1 | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
-          
-          mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD | grep 'supabase/migrations/' || true)
+
+          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations \
+            | sort -r | head -n 1 \
+            | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
+
+          mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD \
+            | grep 'supabase/migrations/' || true)
 
           if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
@@ -44,9 +47,9 @@ jobs:
             PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              line=$(printf "**File:** \`%s\`<br>**Problem:** Timestamp (%s) is not newer than the latest in \`%s\` (%s)." \
+              line=$(printf "- **File:** \`%s\`\n  **Problem:** Timestamp (%s) is not newer than the latest in \`%s\` (%s)." \
                 "$file" "$PR_MIGRATION_TS" "${{ github.base_ref }}" "$LATEST_TARGET_MIGRATION_TS")
-              ERROR_DETAILS+="$line<br>"
+              ERROR_DETAILS+="$line\n"
             fi
           done
 
@@ -54,7 +57,8 @@ jobs:
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
             SUMMARY_BODY=$(cat <<EOF
-          One or more of your migration files have outdated timestamps.<br>
+          One or more of your migration files have outdated timestamps.
+          
           ${ERROR_DETAILS}
           👉 **To fix:** Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
           EOF
@@ -70,7 +74,6 @@ jobs:
             echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
-      #Find the bot's previous comment on the PR.
       - name: Find Comment
         if: always()
         uses: peter-evans/find-comment@v3
@@ -84,10 +87,8 @@ jobs:
         if: always()
         uses: peter-evans/create-or-update-comment@v4
         with:
-          #Pass the found comment's ID to the action.
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
-          # Action to replace the comment's content.
           edit-mode: replace
           body: |
             ### ${{ steps.check.outputs.summary_title }}
