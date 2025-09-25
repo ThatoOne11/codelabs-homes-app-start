@@ -32,7 +32,6 @@ jobs:
 
           if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
             echo "summary_title=✅ Supabase Migration Check" >> "$GITHUB_OUTPUT"
-            # Use multi-line output syntax for consistency
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "No new migrations detected." >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
@@ -45,7 +44,8 @@ jobs:
             PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              ERROR_DETAILS+="**File:** \`${file}\`\n**Problem:** Timestamp (${PR_MIGRATION_TS}) is not newer than the latest in \`${{ github.base_ref }}\` (${LATEST_TARGET_MIGRATION_TS}).\n"
+              # CORRECTED LINE: Use $'' to ensure \n is interpreted as a newline.
+              ERROR_DETAILS+=$'**File:** `${file}`\n**Problem:** Timestamp ('${PR_MIGRATION_TS}') is not newer than the latest in `${{ github.base_ref }}` ('${LATEST_TARGET_MIGRATION_TS}').\n'
             fi
           done
 
@@ -57,14 +57,12 @@ jobs:
           👉 **To fix:** Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
           EOF
           )
-            # CORRECTED SYNTAX: Use the required multi-line output format for GitHub Actions.
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "$SUMMARY_BODY" >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
             exit 1
           else
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
-            # Use multi-line output syntax for consistency
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "All new migration timestamps are valid." >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
