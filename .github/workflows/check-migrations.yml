@@ -1,4 +1,4 @@
-name: "PR: Check Supabase Migration Order"
+name: "Check Supabase PR Migrations"
 
 on:
   pull_request_target:
@@ -7,7 +7,7 @@ on:
       - "supabase/migrations/**"
 
 jobs:
-  check_and_summarize:
+  validate_migrations:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
