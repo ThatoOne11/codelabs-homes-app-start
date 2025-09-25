@@ -1,62 +1,99 @@
-name: Check Supabase Migrations
+name: "Check Supabase PR Migrations"
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
-    paths:
-      - "supabase/migrations/**"
 
 jobs:
-  check-migration-timestamp:
+  validate_migrations:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetches all history for all branches and tags
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
-      - name: Verify Migration Timestamp
+      - name: Verify Migration Timestamp & Prepare Summary
+        id: check
         run: |
           set -euo pipefail
-
-          # The target branch (e.g., 'develop' or 'main')
           TARGET_BRANCH="origin/${{ github.base_ref }}"
 
-          # Find the timestamp of the latest migration in the target branch.
-          # We list files, sort them descending, take the first one, and extract the timestamp prefix.
-          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations | grep -E '^[0-9]+' | sort -r | head -n 1 | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
+          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations \
+            | sort -r | head -n 1 \
+            | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
 
-          echo "Latest migration timestamp on '${TARGET_BRANCH}' is: ${LATEST_TARGET_MIGRATION_TS}"
+          mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD \
+            | grep 'supabase/migrations/' || true)
 
-          # Find any new migration files added in this PR (status 'A' for Added).
-          # The three dots (...) compare the tip of the PR branch with the merge base.
-          mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD | grep 'supabase/migrations/' || true)
-
+          # If no migrations are found, set the output and exit silently.
           if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
-            echo "✅ No new migrations detected in this PR. Check passed."
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
+            echo "post_comment=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "Found ${#NEW_MIGRATIONS[@]} new migration(s) to check..."
-
+          ERROR_DETAILS=""
           HAS_ERROR=false
           for file in "${NEW_MIGRATIONS[@]}"; do
-            PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
-            echo "-> Checking '${file}' with timestamp ${PR_MIGRATION_TS}"
+            [ -z "$file" ] && continue
             
-            # Compare the timestamps numerically
+            FILENAME=$(basename "$file")
+            PR_MIGRATION_TS="${FILENAME%%_*}"
+            
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
-              echo "❌ ERROR: Migration file '${file}' has a timestamp (${PR_MIGRATION_TS}) that is not newer than the latest migration in '${{ github.base_ref }}' (${LATEST_TARGET_MIGRATION_TS})."
               HAS_ERROR=true
-            else
-              echo "✅ Timestamp ${PR_MIGRATION_TS} is valid."
+              ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
             fi
           done
+          
+          # If migrations are found, always set post_comment to true.
+          echo "post_comment=true" >> "$GITHUB_OUTPUT"
 
           if [ "$HAS_ERROR" = true ]; then
-            echo ""
-            echo "👉 To fix this, please rebase your branch on the latest '${{ github.base_ref }}' and rename your migration file(s) to have a current timestamp."
-            exit 1
+            echo "conclusion=failure" >> "$GITHUB_OUTPUT"
+            echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
+            {
+              echo "summary_body<<EOF"
+              echo "The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):"
+              echo ""
+              echo "$ERROR_DETAILS"
+              echo "👉 To fix: Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp."
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          
+          else
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
+            echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
+            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
+            echo "No conflicts were found. Migrations are ready for merge." >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "🎉 All new migration timestamps are valid."
+      - name: Find Comment
+        if: always() && steps.check.outputs.post_comment == 'true'
+        uses: peter-evans/find-comment@v3
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: Supabase Migration Check
+
+      - name: Create or Update PR Comment
+        if: always() && steps.check.outputs.post_comment == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            ### ${{ steps.check.outputs.summary_title }}
+            ${{ steps.check.outputs.summary_body }}
+
+      - name: Report Final Status
+        if: steps.check.outputs.conclusion == 'failure'
+        run: exit 1
