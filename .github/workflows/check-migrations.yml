@@ -66,7 +66,7 @@ jobs:
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "No timestamp conflicts were found. The migration order is valid and ready for merge." >> "$GITHUB_OUTPUT"
+            echo "No conflicts were found. Migrations are valid and ready for merge." >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
