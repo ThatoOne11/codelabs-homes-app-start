@@ -44,18 +44,18 @@ jobs:
             PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              # FINAL FIX: Use printf for safe, reliable string formatting.
-              # This correctly expands all variables and uses <br> for line breaks.
               line=$(printf "**File:** \`%s\`<br>**Problem:** Timestamp (%s) is not newer than the latest in \`%s\` (%s)." \
                 "$file" "$PR_MIGRATION_TS" "${{ github.base_ref }}" "$LATEST_TARGET_MIGRATION_TS")
-              ERROR_DETAILS+="$line<br><br>"
+              # CHANGE 1: Use a single <br> for tighter spacing between multiple errors.
+              ERROR_DETAILS+="$line<br>"
             fi
           done
 
           if [ "$HAS_ERROR" = true ]; then
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
+            # CHANGE 2: Use single <br> tags instead of double for tighter spacing overall.
             SUMMARY_BODY=$(cat <<EOF
-          One or more migration files have outdated timestamps.<br><br>
+          One or more migration files have outdated timestamps.<br>
           ${ERROR_DETAILS}
           👉 **To fix:** Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
           EOF
@@ -80,7 +80,7 @@ jobs:
 
     steps:
       - name: Create or Update PR Comment
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evan/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
