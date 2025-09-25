@@ -62,7 +62,6 @@ jobs:
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
             echo "$SUMMARY_BODY" >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
-            exit 1
           else
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
