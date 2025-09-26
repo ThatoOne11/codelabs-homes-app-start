@@ -61,27 +61,26 @@ jobs:
           if [ "$HAS_ERROR" = true ]; then
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
-            {
-              echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-              echo "The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):" >> "$GITHUB_OUTPUT"
-              echo >> "$GITHUB_OUTPUT"
-              
-              # Append bullet list safely line by line
-              while IFS= read -r line; do
-                echo "$line" >> "$GITHUB_OUTPUT"
-              done <<< "$ERROR_DETAILS"
-              
-              echo >> "$GITHUB_OUTPUT"
-              echo "👉 To fix: Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp." >> "$GITHUB_OUTPUT"
-              echo "EOF" >> "$GITHUB_OUTPUT"
+            
+            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
+            echo "The following files have timestamps older than the latest in \`main\` ($LATEST_TARGET_MIGRATION_TS):" >> "$GITHUB_OUTPUT"
+            echo >> "$GITHUB_OUTPUT"
+            
+            # Append bullet list safely line by line
+            while IFS= read -r line; do
+              echo "$line" >> "$GITHUB_OUTPUT"
+            done <<< "$ERROR_DETAILS"
+            
+            echo >> "$GITHUB_OUTPUT"
+            echo "👉 To fix: Merge or Rebase your branch on \`main\` and rename your migration file(s) to a current timestamp." >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          
           else
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
-            {
-              echo "summary_body<<EOF"
-          No conflicts were found. Migrations are ready for merge.
-          EOF
-            } >> "$GITHUB_OUTPUT"
+            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
+            echo "No conflicts were found. Migrations are ready for merge." >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Find Comment
