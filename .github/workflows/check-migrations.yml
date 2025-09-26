@@ -53,6 +53,7 @@ jobs:
           
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
+              # Append bullet safely
               ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
             fi
           done
