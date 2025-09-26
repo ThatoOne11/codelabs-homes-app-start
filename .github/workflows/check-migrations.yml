@@ -25,60 +25,55 @@ jobs:
           set -euo pipefail
           TARGET_BRANCH="origin/${{ github.base_ref }}"
 
+          # Get latest migration timestamp in target branch
           LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations \
             | sort -r | head -n 1 \
             | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
 
+          # Get newly added migration files in PR
           mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD \
             | grep 'supabase/migrations/' || true)
 
-          if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
-            echo "conclusion=success" >> "$GITHUB_OUTPUT"
-            echo "summary_title=✅ Supabase Migration Check" >> "$GITHUB_OUTPUT"
-            {
-              echo "summary_body<<EOF"
-              echo "No new migrations detected."
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           ERROR_DETAILS=""
           HAS_ERROR=false
+
           for file in "${NEW_MIGRATIONS[@]}"; do
             [ -z "$file" ] && continue
-          
+
             FILENAME=$(basename "$file")
             PR_MIGRATION_TS="${FILENAME%%_*}"
-          
+
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
               ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
             fi
           done
-          
+
+          # Prepare output even if there are no migrations
           if [ "$HAS_ERROR" = true ]; then
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
-            
-            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "The following files have timestamps older than the latest in \`main\` ($LATEST_TARGET_MIGRATION_TS):" >> "$GITHUB_OUTPUT"
-            echo >> "$GITHUB_OUTPUT"
-            
-            while IFS= read -r line; do
-              echo "$line" >> "$GITHUB_OUTPUT"
-            done <<< "$ERROR_DETAILS"
-            
-            echo >> "$GITHUB_OUTPUT"
-            echo "👉 To fix: Merge or Rebase your branch on \`main\` and rename your migration file(s) to a current timestamp." >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          
+            {
+              echo "summary_body<<EOF"
+The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):
+
+$ERROR_DETAILS
+👉 To fix: Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
+EOF
+            } >> "$GITHUB_OUTPUT"
           else
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
+
+            if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
+              BODY="No new migrations detected."
+            else
+              BODY="All new migrations have timestamps newer than $LATEST_TARGET_MIGRATION_TS."
+            fi
+
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "No conflicts were found. Migrations are ready for merge." >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
+$BODY
+EOF
           fi
 
       - name: Find Comment
