@@ -48,34 +48,34 @@ jobs:
           for file in "${NEW_MIGRATIONS[@]}"; do
             [ -z "$file" ] && continue
           
-            FILENAME=$(basename "$file")  
-            PR_MIGRATION_TS=$(echo "$FILENAME" | cut -d'_' -f1)
+            FILENAME=$(basename "$file") 
+            PR_MIGRATION_TS="${FILENAME%%_*}" 
           
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              line=$(printf -- "- `%s` (Timestamp: %s)" "$FILENAME" "$PR_MIGRATION_TS")
-              ERROR_DETAILS+="$line"$'\n'
+              # Use printf to generate a clean bullet; append newline reliably
+              ERROR_DETAILS+=$(printf -- "- `%s` (Timestamp: %s)\n" "$FILENAME" "$PR_MIGRATION_TS")
             fi
           done
-
+          
           if [ "$HAS_ERROR" = true ]; then
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
             {
               echo "summary_body<<EOF"
-              echo "The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):"
-              echo
-              echo -e "$ERROR_DETAILS"
-              echo "👉 **To fix:** Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp."
-              echo "EOF"
+          The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):
+          
+          $ERROR_DETAILS
+          👉 To fix: Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
+          EOF
             } >> "$GITHUB_OUTPUT"
           else
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
             {
               echo "summary_body<<EOF"
-              echo "No conflicts were found. Migrations are ready for merge."
-              echo "EOF"
+          No conflicts were found. Migrations are ready for merge.
+          EOF
             } >> "$GITHUB_OUTPUT"
           fi
 
