@@ -53,7 +53,6 @@ jobs:
           
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              # Use printf -- to prevent option parsing if $file starts with '-'
               line=$(printf -- "- `%s` (Timestamp: %s)" "$file" "$PR_MIGRATION_TS")
               ERROR_DETAILS+="$line\n"
             fi
