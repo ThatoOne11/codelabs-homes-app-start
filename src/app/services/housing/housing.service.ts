@@ -11,7 +11,6 @@ export class HousingService {
 
   // Method to get all housing locations
   // This method is used in HomeComponent to fetch all locations initially
-  // It returns an array of HousingLocation objects or an empty array if no locations are found
   async getAllHousingLocations(): Promise<HousingLocation[]> {
     try {
       const { data, error } = await this.supabase.getLocations();
