@@ -54,7 +54,7 @@ jobs:
               HAS_ERROR=true
               # Correct printf: filename first, timestamp second
               line=$(printf -- "- `%s` (Timestamp: %s)" "$file" "$PR_MIGRATION_TS")
-              ERROR_DETAILS+="$line\n"
+              ERROR_DETAILS+="$line"$'\n'
             fi
           done
 
