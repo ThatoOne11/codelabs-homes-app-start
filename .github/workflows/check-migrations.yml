@@ -46,11 +46,16 @@ jobs:
           ERROR_DETAILS=""
           HAS_ERROR=false
           for file in "${NEW_MIGRATIONS[@]}"; do
+            # Skip blank entries just in case
+            [ -z "$file" ] && continue
+          
             PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
+          
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              line=$(printf "- **File:** \`%s\`\n  **Problem:** Timestamp (%s) is not newer than the latest in \`%s\` (%s)." \
-                "$file" "$PR_MIGRATION_TS" "${{ github.base_ref }}" "$LATEST_TARGET_MIGRATION_TS")
+              # Use printf -- to prevent option parsing if $file starts with '-'
+              line=$(printf -- "- **File:** \`%s\`\n  **Problem:** Timestamp (%s) is not newer than the latest in \`%s\` (%s)." \
+                "$file" "$PR_MIGRATION_TS" "main" "$LATEST_TARGET_MIGRATION_TS")
               ERROR_DETAILS+="$line\n"
             fi
           done
