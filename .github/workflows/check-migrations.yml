@@ -53,8 +53,7 @@ jobs:
           
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              # Append bullet safely without printf
-              ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` Timestamp: ${PR_MIGRATION_TS}"$'\n'
+              ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
             fi
           done
           
@@ -66,7 +65,6 @@ jobs:
             echo "The following files have timestamps older than the latest in \`main\` ($LATEST_TARGET_MIGRATION_TS):" >> "$GITHUB_OUTPUT"
             echo >> "$GITHUB_OUTPUT"
             
-            # Append bullet list safely line by line
             while IFS= read -r line; do
               echo "$line" >> "$GITHUB_OUTPUT"
             done <<< "$ERROR_DETAILS"
