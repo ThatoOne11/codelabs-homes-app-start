@@ -48,13 +48,12 @@ jobs:
           for file in "${NEW_MIGRATIONS[@]}"; do
             [ -z "$file" ] && continue
           
-            FILENAME=$(basename "$file") 
-            PR_MIGRATION_TS="${FILENAME%%_*}" 
+            FILENAME=$(basename "$file")
+            PR_MIGRATION_TS="${FILENAME%%_*}"
           
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              # Use printf to generate a clean bullet; append newline reliably
-              ERROR_DETAILS+=$(printf -- "- `%s` (Timestamp: %s)\n" "$FILENAME" "$PR_MIGRATION_TS")
+              ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
             fi
           done
           
