@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-    
+
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
@@ -24,53 +24,58 @@ jobs:
         run: |
           set -euo pipefail
           TARGET_BRANCH="origin/${{ github.base_ref }}"
-          
-          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations | sort -r | head -n 1 | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
-          
-          mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD | grep 'supabase/migrations/' || true)
 
-          if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
-            echo "conclusion=success" >> "$GITHUB_OUTPUT"
-            echo "summary_title=✅ Supabase Migration Check" >> "$GITHUB_OUTPUT"
-            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "No new migrations detected." >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          # Get latest migration timestamp in target branch
+          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations \
+            | sort -r | head -n 1 \
+            | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
+
+          # Get newly added migration files in PR
+          mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD \
+            | grep 'supabase/migrations/' || true)
 
           ERROR_DETAILS=""
           HAS_ERROR=false
+
           for file in "${NEW_MIGRATIONS[@]}"; do
-            PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
+            [ -z "$file" ] && continue
+
+            FILENAME=$(basename "$file")
+            PR_MIGRATION_TS="${FILENAME%%_*}"
+
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              line=$(printf "**File:** \`%s\`<br>**Problem:** Timestamp (%s) is not newer than the latest in \`%s\` (%s)." \
-                "$file" "$PR_MIGRATION_TS" "${{ github.base_ref }}" "$LATEST_TARGET_MIGRATION_TS")
-              ERROR_DETAILS+="$line<br>"
+              ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
             fi
           done
 
+          # Prepare output even if there are no migrations
           if [ "$HAS_ERROR" = true ]; then
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
-            SUMMARY_BODY=$(cat <<EOF
-          One or more of your migration files have outdated timestamps.<br>
-          ${ERROR_DETAILS}
-          👉 **To fix:** Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
-          EOF
-          )
-            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "$SUMMARY_BODY" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
+            {
+              echo "summary_body<<EOF"
+The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):
+
+$ERROR_DETAILS
+👉 To fix: Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
+EOF
+            } >> "$GITHUB_OUTPUT"
           else
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
+
+            if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
+              BODY="No new migrations detected."
+            else
+              BODY="All new migrations have timestamps newer than $LATEST_TARGET_MIGRATION_TS."
+            fi
+
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "No conflicts were found. Migrations are ready for merge." >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
+$BODY
+EOF
           fi
 
-      #Find the bot's previous comment on the PR.
       - name: Find Comment
         if: always()
         uses: peter-evans/find-comment@v3
@@ -84,10 +89,8 @@ jobs:
         if: always()
         uses: peter-evans/create-or-update-comment@v4
         with:
-          #Pass the found comment's ID to the action.
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
-          # Action to replace the comment's content.
           edit-mode: replace
           body: |
             ### ${{ steps.check.outputs.summary_title }}
