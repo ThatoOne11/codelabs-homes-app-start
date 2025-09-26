@@ -54,7 +54,7 @@ jobs:
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
               # Use printf -- to prevent option parsing if $file starts with '-'
-              line=$(printf -- "- %s (Timestamp: %s)" "$file" "$PR_MIGRATION_TS")
+              line=$(printf -- "- `%s` (Timestamp: %s)" "$file" "$PR_MIGRATION_TS")
               ERROR_DETAILS+="$line\n"
             fi
           done
@@ -64,8 +64,7 @@ jobs:
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
             {
               echo "summary_body<<EOF"
-              echo "One or more of your migration files have outdated timestamps."
-              echo "The following files have timestamps that are not newer than the latest in main ($LATEST_TARGET_MIGRATION_TS):"
+              echo "The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):"
               echo
               echo -e "$ERROR_DETAILS"
               echo "👉 **To fix:** Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp."
