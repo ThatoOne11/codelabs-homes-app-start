@@ -48,12 +48,12 @@ jobs:
           for file in "${NEW_MIGRATIONS[@]}"; do
             [ -z "$file" ] && continue
           
-            PR_MIGRATION_TS=$(basename "$file" | cut -d'_' -f1)
+            FILENAME=$(basename "$file")  
+            PR_MIGRATION_TS=$(echo "$FILENAME" | cut -d'_' -f1)
           
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
-              # Correct printf: filename first, timestamp second
-              line=$(printf -- "- `%s` (Timestamp: %s)" "$file" "$PR_MIGRATION_TS")
+              line=$(printf -- "- `%s` (Timestamp: %s)" "$FILENAME" "$PR_MIGRATION_TS")
               ERROR_DETAILS+="$line"$'\n'
             fi
           done
