@@ -1,106 +1,100 @@
 name: "Check Supabase PR Migrations"
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "supabase/migrations/**"
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "supabase/migrations/**"
 
 jobs:
-  validate_migrations:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
+  validate_migrations:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
 
-    steps:
-      - name: Checkout PR code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
-      - name: Verify Migration Timestamp & Prepare Summary
-        id: check
-        run: |
-          set -euo pipefail
-          TARGET_BRANCH="origin/${{ github.base_ref }}"
+      - name: Verify Migration Timestamp & Prepare Summary
+        id: check
+        run: |
+          set -euo pipefail
+          TARGET_BRANCH="origin/${{ github.base_ref }}"
+          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations \
+            | sort -r | head -n 1 \
+            | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
+          mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD \
+            | grep 'supabase/migrations/' || true)
+          if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
+            echo "summary_title=✅ Supabase Migration Check" >> "$GITHUB_OUTPUT"
+            {
+              echo "summary_body<<EOF"
+              echo "No new migrations detected."
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          ERROR_DETAILS=""
+          HAS_ERROR=false
+          for file in "${NEW_MIGRATIONS[@]}"; do
+            [ -z "$file" ] && continue
+          
+            FILENAME=$(basename "$file")
+            PR_MIGRATION_TS="${FILENAME%%_*}"
+          
+            if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
+              HAS_ERROR=true
+              ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
+            fi
+          done
+          
+          if [ "$HAS_ERROR" = true ]; then
+            echo "conclusion=failure" >> "$GITHUB_OUTPUT"
+            echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
+            
+            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
+            echo "The following files have timestamps older than the latest in \`main\` ($LATEST_TARGET_MIGRATION_TS):" >> "$GITHUB_OUTPUT"
+            echo >> "$GITHUB_OUTPUT"
+            
+            while IFS= read -r line; do
+              echo "$line" >> "$GITHUB_OUTPUT"
+            done <<< "$ERROR_DETAILS"
+            
+            echo >> "$GITHUB_OUTPUT"
+            echo "👉 To fix: Merge or Rebase your branch on \`main\` and rename your migration file(s) to a current timestamp." >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          
+          else
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
+            echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
+            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
+            echo "No conflicts were found. Migrations are ready for merge." >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Find Comment
+        if: always()
+        uses: peter-evans/find-comment@v3
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: Supabase Migration Check
 
-          LATEST_TARGET_MIGRATION_TS=$(git ls-tree -r "$TARGET_BRANCH" --name-only supabase/migrations \
-            | sort -r | head -n 1 \
-            | sed -E 's|supabase/migrations/([0-9]+)_.+|\1|' || echo "0")
-
-          mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD \
-            | grep 'supabase/migrations/' || true)
-
-          if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
-            echo "conclusion=success" >> "$GITHUB_OUTPUT"
-            echo "summary_title=✅ Supabase Migration Check" >> "$GITHUB_OUTPUT"
-            {
-              echo "summary_body<<EOF"
-              echo "No new migrations detected."
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          ERROR_DETAILS=""
-          HAS_ERROR=false
-          for file in "${NEW_MIGRATIONS[@]}"; do
-            [ -z "$file" ] && continue
-          
-            FILENAME=$(basename "$file")
-            PR_MIGRATION_TS="${FILENAME%%_*}"
-          
-            if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
-              HAS_ERROR=true
-              ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
-            fi
-          done
-          
-          if [ "$HAS_ERROR" = true ]; then
-            echo "conclusion=failure" >> "$GITHUB_OUTPUT"
-            echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
-            
-            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "The following files have timestamps older than the latest in \`main\` ($LATEST_TARGET_MIGRATION_TS):" >> "$GITHUB_OUTPUT"
-            echo >> "$GITHUB_OUTPUT"
-            
-            while IFS= read -r line; do
-              echo "$line" >> "$GITHUB_OUTPUT"
-            done <<< "$ERROR_DETAILS"
-            
-            echo >> "$GITHUB_OUTPUT"
-            echo "👉 To fix: Merge or Rebase your branch on \`main\` and rename your migration file(s) to a current timestamp." >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          
-          else
-            echo "conclusion=success" >> "$GITHUB_OUTPUT"
-            echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
-            echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "No conflicts were found. Migrations are ready for merge." >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Find Comment
-        if: always()
-        uses: peter-evans/find-comment@v3
-        id: fc
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'github-actions[bot]'
-          body-includes: Supabase Migration Check
-
-      - name: Create or Update PR Comment
-        if: always()
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          comment-id: ${{ steps.fc.outputs.comment-id }}
-          issue-number: ${{ github.event.pull_request.number }}
-          edit-mode: replace
-          body: |
-            ### ${{ steps.check.outputs.summary_title }}
-            ${{ steps.check.outputs.summary_body }}
-
-      - name: Report Final Status
-        if: steps.check.outputs.conclusion == 'failure'
-        run: exit 1
+      - name: Create or Update PR Comment
+        if: always()
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            ### ${{ steps.check.outputs.summary_title }}
+            ${{ steps.check.outputs.summary_body }}
+      - name: Report Final Status
+        if: steps.check.outputs.conclusion == 'failure'
+        run: exit 1
