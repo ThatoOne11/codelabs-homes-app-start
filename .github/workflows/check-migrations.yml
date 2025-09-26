@@ -30,14 +30,10 @@ jobs:
           mapfile -t NEW_MIGRATIONS < <(git diff --name-only --diff-filter=A "$TARGET_BRANCH"...HEAD \
             | grep 'supabase/migrations/' || true)
 
+          # If no migrations are found, set the output and exit silently.
           if [ ${#NEW_MIGRATIONS[@]} -eq 0 ]; then
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
-            echo "summary_title=✅ Supabase Migration Check" >> "$GITHUB_OUTPUT"
-            {
-              echo "summary_body<<EOF"
-              echo "No new migrations detected."
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
+            echo "post_comment=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -55,11 +51,12 @@ jobs:
             fi
           done
           
+          # If migrations are found, always set post_comment to true.
+          echo "post_comment=true" >> "$GITHUB_OUTPUT"
+
           if [ "$HAS_ERROR" = true ]; then
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
-            
-            # This is the new, simplified block that avoids the error
             {
               echo "summary_body<<EOF"
               echo "The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):"
@@ -73,12 +70,12 @@ jobs:
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
             echo "summary_body<<EOF" >> "$GITHUB_OUTPUT"
-            echo "No conflicts were found. Migrations are ready for merge." >> "$GITHUB_OUTPUT"
+            echo "All new migration files have a valid timestamp." >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Find Comment
-        if: always()
+        if: always() && steps.check.outputs.post_comment == 'true'
         uses: peter-evans/find-comment@v3
         id: fc
         with:
@@ -87,7 +84,7 @@ jobs:
           body-includes: Supabase Migration Check
 
       - name: Create or Update PR Comment
-        if: always()
+        if: always() && steps.check.outputs.post_comment == 'true'
         uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
