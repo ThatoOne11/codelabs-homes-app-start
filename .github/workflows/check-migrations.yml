@@ -53,7 +53,7 @@ jobs:
             if [[ "$PR_MIGRATION_TS" -le "$LATEST_TARGET_MIGRATION_TS" ]]; then
               HAS_ERROR=true
               # Correct printf: filename first, timestamp second
-              line=$(printf -- "- `%s`(Timestamp: %s)" "$file" "$PR_MIGRATION_TS")
+              line=$(printf -- "- `%s` (Timestamp: %s)" "$file" "$PR_MIGRATION_TS")
               ERROR_DETAILS+="$line\n"
             fi
           done
