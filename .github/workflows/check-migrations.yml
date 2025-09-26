@@ -59,16 +59,13 @@ jobs:
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
             echo "summary_title=❌ Supabase Migration Check Failed" >> "$GITHUB_OUTPUT"
             
-SUMMARY_BODY=$(cat <<EOF
-The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):
-
-$ERROR_DETAILS
-👉 To fix: Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp.
-EOF
-)
+            # This is the new, simplified block that avoids the error
             {
               echo "summary_body<<EOF"
-              echo "$SUMMARY_BODY"
+              echo "The following files have timestamps older than the latest in \`${{ github.base_ref }}\` ($LATEST_TARGET_MIGRATION_TS):"
+              echo ""
+              echo "$ERROR_DETAILS"
+              echo "👉 To fix: Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp."
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           
