@@ -113,23 +113,23 @@ jobs:
 
           # 1. Functions Check
           if [ "${{ steps.deploy_functions.outcome }}" == "success" ]; then
-            SUMMARY+="- Cloud Functions updated (Full Group Deploy)\n"
+            SUMMARY+=" Cloud Functions updated (Full Deploy)\n"
           elif [ "${{ steps.deploy_functions.outcome }}" == "failure" ]; then
-            SUMMARY+="- Cloud Functions deployment FAILED\n"
+            SUMMARY+="❌ Cloud Functions deployment FAILED\n"
           fi
 
           # 2. Firestore Check
           if [ "${{ steps.deploy_firestore.outcome }}" == "success" ]; then
             SUMMARY+="- Firestore Rules updated\n"
           elif [ "${{ steps.deploy_firestore.outcome }}" == "failure" ]; then
-            SUMMARY+="- Firestore Rules deployment FAILED\n"
+            SUMMARY+="❌ Firestore Rules deployment FAILED\n"
           fi
 
           # 3. Storage Check
           if [ "${{ steps.deploy_storage.outcome }}" == "success" ]; then
             SUMMARY+="- Storage Rules updated\n"
           elif [ "${{ steps.deploy_storage.outcome }}" == "failure" ]; then
-            SUMMARY+="- Storage Rules deployment FAILED\n"
+            SUMMARY+="❌ Storage Rules deployment FAILED\n"
           fi
 
           # Fallback if nothing happened
