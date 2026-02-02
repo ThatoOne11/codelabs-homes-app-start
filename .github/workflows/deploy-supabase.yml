@@ -178,20 +178,21 @@ jobs:
           payload: |
             {
               "channel": "C09FJTNSAB0",
-              "text": "Deployment Status: ${{ job.status }}",
+              "text": "Supabase Deployment: ${{ job.status }}",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "Deployment Status: ${{ job.status }}"
+                    "text": ":supabase: Supabase Deployment: ${{ job.status }}",
+                    "emoji": true
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Workflow: *${{ github.workflow }}*\nBranch: *${{ github.ref_name }}*\nCommit: `${{ github.sha }}`\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
+                    "text": "Repository: *${{ github.repository }}*\nWorkflow: *${{ github.workflow }}*\nBranch: *${{ github.ref_name }}*\nCommit: `${{ github.sha }}`\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
                   }
                 },
                 {
