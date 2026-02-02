@@ -113,23 +113,23 @@ jobs:
 
           # 1. Functions Check
           if [ "${{ steps.deploy_functions.outcome }}" == "success" ]; then
-            SUMMARY+="- Cloud Functions updated (Full Group Deploy)\n"
+            SUMMARY+=" Cloud Functions updated (Full Deploy)\n"
           elif [ "${{ steps.deploy_functions.outcome }}" == "failure" ]; then
-            SUMMARY+="- Cloud Functions deployment FAILED\n"
+            SUMMARY+="❌ Cloud Functions deployment FAILED\n"
           fi
 
           # 2. Firestore Check
           if [ "${{ steps.deploy_firestore.outcome }}" == "success" ]; then
             SUMMARY+="- Firestore Rules updated\n"
           elif [ "${{ steps.deploy_firestore.outcome }}" == "failure" ]; then
-            SUMMARY+="- Firestore Rules deployment FAILED\n"
+            SUMMARY+="❌ Firestore Rules deployment FAILED\n"
           fi
 
           # 3. Storage Check
           if [ "${{ steps.deploy_storage.outcome }}" == "success" ]; then
             SUMMARY+="- Storage Rules updated\n"
           elif [ "${{ steps.deploy_storage.outcome }}" == "failure" ]; then
-            SUMMARY+="- Storage Rules deployment FAILED\n"
+            SUMMARY+="❌ Storage Rules deployment FAILED\n"
           fi
 
           # Fallback if nothing happened
@@ -141,7 +141,7 @@ jobs:
             fi
           fi
 
-          echo "##🔥 Firebase Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔥 Firebase Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo -e "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
           SLACK_TEXT="${SUMMARY//$'\n'/\\n}"
@@ -157,7 +157,7 @@ jobs:
           payload: |
             {
               "channel": "C0ABX3W93L7",
-              "text": ":firebase: Deployment Status: ${{ job.status }}",
+              "text": "Firebase Deployment: ${{ job.status }}",
               "blocks": [
                 {
                   "type": "header",
@@ -171,7 +171,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Workflow: *${{ github.workflow }}*\nBranch: *${{ github.ref_name }}*\nCommit: `${{ github.sha }}`\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
+                    "text": "Repository: *${{ github.repository }}*\nWorkflow: *${{ github.workflow }}*\nBranch: *${{ github.ref_name }}*\nCommit: `${{ github.sha }}`\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>"
                   }
                 },
                 {
