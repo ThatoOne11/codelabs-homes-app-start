@@ -5,9 +5,9 @@ on:
     branches:
       - main
     paths:
-      - "functions/**"
-      - "firestore.rules"
-      - "storage.rules"
+      - "firebase/functions/**"
+      - "firebase/firestore.rules"
+      - "firebase/storage.rules"
   workflow_dispatch:
     inputs:
       commit_sha:
