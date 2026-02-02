@@ -177,7 +177,7 @@ jobs:
           payload-templated: true
           payload: |
             {
-              "channel": "C09FJTNSAB0",
+              "channel": "C0ABX3W93L7",
               "text": "Supabase Deployment: ${{ job.status }}",
               "blocks": [
                 {
