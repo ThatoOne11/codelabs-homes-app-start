@@ -1,4 +1,4 @@
-name: Deploy Supabase Functions & Emails
+name: (Deploy) Supabase Functions & Emails
 
 on:
   push:

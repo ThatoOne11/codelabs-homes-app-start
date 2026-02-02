@@ -1,4 +1,4 @@
-name: "Check Supabase PR Migrations"
+name: (Check) Supabase PR Migrations
 
 on:
   pull_request_target:
@@ -50,7 +50,7 @@ jobs:
               ERROR_DETAILS="${ERROR_DETAILS}- \`${FILENAME}\` (Timestamp: ${PR_MIGRATION_TS})"$'\n'
             fi
           done
-          
+
           # If migrations are found, always set post_comment to true.
           echo "post_comment=true" >> "$GITHUB_OUTPUT"
 
@@ -65,7 +65,7 @@ jobs:
               echo "👉 To fix: Merge or Rebase your branch on \`${{ github.base_ref }}\` and rename your migration file(s) to a current timestamp."
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
-          
+
           else
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
             echo "summary_title=✅ Supabase Migration Check Passed" >> "$GITHUB_OUTPUT"
@@ -80,7 +80,7 @@ jobs:
         id: fc
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'github-actions[bot]'
+          comment-author: "github-actions[bot]"
           body-includes: Supabase Migration Check
 
       - name: Create or Update PR Comment
