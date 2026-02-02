@@ -141,7 +141,7 @@ jobs:
             fi
           fi
 
-          echo "## Firebase Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "##🔥 Firebase Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo -e "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
           SLACK_TEXT="${SUMMARY//$'\n'/\\n}"
@@ -157,13 +157,14 @@ jobs:
           payload: |
             {
               "channel": "C0ABX3W93L7",
-              "text": "Deployment Status: ${{ job.status }}",
+              "text": ":firebase: Deployment Status: ${{ job.status }}",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "Firebase Deployment: ${{ job.status }}"
+                    "text": ":firebase: Firebase Deployment: ${{ job.status }}",
+                    "emoji": true
                   }
                 },
                 {
