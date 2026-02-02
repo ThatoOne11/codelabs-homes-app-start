@@ -46,8 +46,6 @@ jobs:
         run: |
           cd firebase/functions
           npm ci
-          # If using TypeScript, uncomment the line below:
-          # npm run build
 
       - name: Detect and Prepare Deployments
         id: deploy_prep
@@ -65,25 +63,22 @@ jobs:
           echo "Using git diff range: $RANGE"
 
           # Detect Changes
-          # 1. Functions (Updated to look for firebase/functions/)
           if git diff --name-only "$RANGE" | grep -q 'firebase/functions/'; then
             echo "functions_changed=true" >> $GITHUB_OUTPUT
-            echo "Functions have changed."
           fi
-
-          # 2. Firestore Rules (Updated to look for firebase/firestore.rules)
           if git diff --name-only "$RANGE" | grep -q 'firebase/firestore.rules'; then
             echo "firestore_changed=true" >> $GITHUB_OUTPUT
-            echo "Firestore Rules have changed."
           fi
-
-          # 3. Storage Rules (Updated to look for firebase/storage.rules)
           if git diff --name-only "$RANGE" | grep -q 'firebase/storage.rules'; then
             echo "storage_changed=true" >> $GITHUB_OUTPUT
-            echo "Storage Rules have changed."
           fi
 
+      # ---------------------------------------------------------
+      # DEPLOYMENT STEPS (Now with IDs)
+      # ---------------------------------------------------------
+
       - name: Deploy Cloud Functions
+        id: deploy_functions
         if: steps.deploy_prep.outputs.functions_changed == 'true'
         working-directory: ./firebase # Runs where firebase.json is
         run: |
@@ -91,6 +86,7 @@ jobs:
           firebase deploy --only functions --non-interactive --force
 
       - name: Deploy Firestore Rules
+        id: deploy_firestore
         if: steps.deploy_prep.outputs.firestore_changed == 'true'
         working-directory: ./firebase #  Runs where firebase.json is
         run: |
@@ -98,11 +94,16 @@ jobs:
           firebase deploy --only firestore:rules --non-interactive
 
       - name: Deploy Storage Rules
+        id: deploy_storage
         if: steps.deploy_prep.outputs.storage_changed == 'true'
         working-directory: ./firebase # Runs where firebase.json is
         run: |
           echo "📦 Deploying Storage Rules..."
           firebase deploy --only storage --non-interactive
+
+      # ---------------------------------------------------------
+      # SUMMARY & NOTIFICATION
+      # ---------------------------------------------------------
 
       - name: Deployment Summary
         if: always()
@@ -110,26 +111,39 @@ jobs:
         run: |
           SUMMARY=""
 
-          if [ "${{ steps.deploy_prep.outputs.functions_changed }}" == "true" ]; then
+          # 1. Functions Check
+          if [ "${{ steps.deploy_functions.outcome }}" == "success" ]; then
             SUMMARY+="- Cloud Functions updated (Full Group Deploy)\n"
+          elif [ "${{ steps.deploy_functions.outcome }}" == "failure" ]; then
+            SUMMARY+="- Cloud Functions deployment FAILED\n"
           fi
 
-          if [ "${{ steps.deploy_prep.outputs.firestore_changed }}" == "true" ]; then
+          # 2. Firestore Check
+          if [ "${{ steps.deploy_firestore.outcome }}" == "success" ]; then
             SUMMARY+="- Firestore Rules updated\n"
+          elif [ "${{ steps.deploy_firestore.outcome }}" == "failure" ]; then
+            SUMMARY+="- Firestore Rules deployment FAILED\n"
           fi
 
-          if [ "${{ steps.deploy_prep.outputs.storage_changed }}" == "true" ]; then
+          # 3. Storage Check
+          if [ "${{ steps.deploy_storage.outcome }}" == "success" ]; then
             SUMMARY+="- Storage Rules updated\n"
+          elif [ "${{ steps.deploy_storage.outcome }}" == "failure" ]; then
+            SUMMARY+="- Storage Rules deployment FAILED\n"
           fi
 
+          # Fallback if nothing happened
           if [ -z "$SUMMARY" ]; then
-            SUMMARY="- No significant changes detected. No deployments were necessary."
+            if [ "${{ job.status }}" == "success" ]; then
+               SUMMARY="- No significant changes detected. No deployments were necessary."
+            else
+               SUMMARY="- Workflow failed."
+            fi
           fi
 
           echo "## 🔥 Firebase Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo -e "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
-          # Escape newlines for Slack JSON payload compatibility
           SLACK_TEXT="${SUMMARY//$'\n'/\\n}"
           echo "slack_text=$SLACK_TEXT" >> $GITHUB_OUTPUT
 
