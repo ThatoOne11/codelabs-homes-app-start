@@ -1,4 +1,4 @@
-name: Deploy Firebase Functions & Rules
+name: (Deploy) Firebase Functions & Rules
 
 on:
   push:
@@ -82,7 +82,7 @@ jobs:
         if: steps.deploy_prep.outputs.functions_changed == 'true'
         working-directory: ./firebase # Runs where firebase.json is
         run: |
-          echo "🚀 Deploying Cloud Functions..."
+          echo "Deploying Cloud Functions..."
           firebase deploy --only functions --non-interactive --force
 
       - name: Deploy Firestore Rules
@@ -90,7 +90,7 @@ jobs:
         if: steps.deploy_prep.outputs.firestore_changed == 'true'
         working-directory: ./firebase #  Runs where firebase.json is
         run: |
-          echo "📜 Deploying Firestore Rules..."
+          echo "Deploying Firestore Rules..."
           firebase deploy --only firestore:rules --non-interactive
 
       - name: Deploy Storage Rules
@@ -98,7 +98,7 @@ jobs:
         if: steps.deploy_prep.outputs.storage_changed == 'true'
         working-directory: ./firebase # Runs where firebase.json is
         run: |
-          echo "📦 Deploying Storage Rules..."
+          echo "Deploying Storage Rules..."
           firebase deploy --only storage --non-interactive
 
       # ---------------------------------------------------------
@@ -135,13 +135,13 @@ jobs:
           # Fallback if nothing happened
           if [ -z "$SUMMARY" ]; then
             if [ "${{ job.status }}" == "success" ]; then
-               SUMMARY="- No significant changes detected. No deployments were necessary."
+               SUMMARY="- No changes detected."
             else
                SUMMARY="- Workflow failed."
             fi
           fi
 
-          echo "## 🔥 Firebase Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Firebase Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo -e "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
           SLACK_TEXT="${SUMMARY//$'\n'/\\n}"
