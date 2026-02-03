@@ -74,7 +74,7 @@ jobs:
           fi
 
       # ---------------------------------------------------------
-      # DEPLOYMENT STEPS (Now with IDs)
+      # DEPLOYMENT STEPS
       # ---------------------------------------------------------
 
       - name: Deploy Cloud Functions
@@ -135,7 +135,7 @@ jobs:
           # Fallback if nothing happened
           if [ -z "$SUMMARY" ]; then
             if [ "${{ job.status }}" == "success" ]; then
-               SUMMARY="- No changes detected."
+               SUMMARY="- No changes detected. No deployments were necessary."
             else
                SUMMARY="- Workflow failed."
             fi
