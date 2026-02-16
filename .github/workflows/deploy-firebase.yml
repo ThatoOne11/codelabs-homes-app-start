@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: "read"
-      id-token: "write" # Required for google-github-actions/auth
+      id-token: "write"
 
     steps:
       - name: Checkout repository
@@ -52,6 +52,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          # 1. Determine Range
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             RANGE="HEAD^..HEAD"
             if [ -n "${{ github.event.inputs.commit_sha }}" ]; then
@@ -62,16 +63,25 @@ jobs:
           fi
           echo "Using git diff range: $RANGE"
 
-          # Detect Changes
-          if git diff --name-only "$RANGE" | grep -q 'firebase/functions/'; then
-            echo "functions_changed=true" >> $GITHUB_OUTPUT
-          fi
-          if git diff --name-only "$RANGE" | grep -q 'firebase/firestore.rules'; then
+          # 2. Get Changed Files
+          # (Tr '\n' ' ' makes it a single line space-separated string for the node script)
+          CHANGED_FILES=$(git diff --name-only "$RANGE" | tr '\n' ' ' || true)
+          echo "Changed files: $CHANGED_FILES"
+
+          # 3. Detect Rules Changes
+          if echo "$CHANGED_FILES" | grep -q 'firebase/firestore.rules'; then
             echo "firestore_changed=true" >> $GITHUB_OUTPUT
           fi
-          if git diff --name-only "$RANGE" | grep -q 'firebase/storage.rules'; then
+          if echo "$CHANGED_FILES" | grep -q 'firebase/storage.rules'; then
             echo "storage_changed=true" >> $GITHUB_OUTPUT
           fi
+
+          # 4. Smart Function Detection
+          # Run the script to find exactly which functions to deploy
+          DEPLOY_TARGETS=$(node .github/scripts/resolve-deploy.js "$CHANGED_FILES")
+
+          echo "Calculated function targets: $DEPLOY_TARGETS"
+          echo "function_targets=$DEPLOY_TARGETS" >> $GITHUB_OUTPUT
 
       # ---------------------------------------------------------
       # DEPLOYMENT STEPS
@@ -79,16 +89,23 @@ jobs:
 
       - name: Deploy Cloud Functions
         id: deploy_functions
-        if: steps.deploy_prep.outputs.functions_changed == 'true'
-        working-directory: ./firebase # Runs where firebase.json is
+        if: steps.deploy_prep.outputs.function_targets != ''
+        working-directory: ./firebase # Important: Run where firebase.json is
         run: |
-          echo "Deploying Cloud Functions..."
-          firebase deploy --only functions --non-interactive --force
+          TARGETS="${{ steps.deploy_prep.outputs.function_targets }}"
+
+          if [ "$TARGETS" == "all" ]; then
+            echo "🚀 Deploying ALL Cloud Functions..."
+            firebase deploy --only functions --non-interactive --force
+          else
+            echo "🚀 Deploying specific functions ($TARGETS)..."
+            firebase deploy --only "$TARGETS" --non-interactive --force
+          fi
 
       - name: Deploy Firestore Rules
         id: deploy_firestore
         if: steps.deploy_prep.outputs.firestore_changed == 'true'
-        working-directory: ./firebase #  Runs where firebase.json is
+        working-directory: ./firebase
         run: |
           echo "Deploying Firestore Rules..."
           firebase deploy --only firestore:rules --non-interactive
@@ -96,7 +113,7 @@ jobs:
       - name: Deploy Storage Rules
         id: deploy_storage
         if: steps.deploy_prep.outputs.storage_changed == 'true'
-        working-directory: ./firebase # Runs where firebase.json is
+        working-directory: ./firebase
         run: |
           echo "Deploying Storage Rules..."
           firebase deploy --only storage --non-interactive
@@ -111,33 +128,46 @@ jobs:
         run: |
           SUMMARY=""
 
-          # 1. Functions Check
-          if [ "${{ steps.deploy_functions.outcome }}" == "success" ]; then
-            SUMMARY+=" Cloud Functions updated (Full Deploy)\n"
-          elif [ "${{ steps.deploy_functions.outcome }}" == "failure" ]; then
-            SUMMARY+="❌ Cloud Functions deployment FAILED\n"
+          # Variables
+          FUNC_TARGETS="${{ steps.deploy_prep.outputs.function_targets }}"
+          FUNC_OUTCOME="${{ steps.deploy_functions.outcome }}"
+          FIRESTORE_OUTCOME="${{ steps.deploy_firestore.outcome }}"
+          STORAGE_OUTCOME="${{ steps.deploy_storage.outcome }}"
+
+          # 1. Functions Summary
+          if [ "$FUNC_OUTCOME" == "success" ]; then
+            # Format targets for display (remove 'functions:' prefix)
+            DISPLAY_TARGETS=$(echo "$FUNC_TARGETS" | sed 's/functions://g' | sed 's/,/, /g')
+            
+            if [ "$FUNC_TARGETS" == "all" ]; then
+               SUMMARY+="ALL Cloud Functions Deployed\n"
+            else
+               SUMMARY+="Cloud Functions Deployed: $DISPLAY_TARGETS\n"
+            fi
+          elif [ "$FUNC_OUTCOME" == "failure" ]; then
+            SUMMARY+="❌ Cloud Functions Deployment FAILED\n"
           fi
 
-          # 2. Firestore Check
-          if [ "${{ steps.deploy_firestore.outcome }}" == "success" ]; then
-            SUMMARY+="- Firestore Rules updated\n"
-          elif [ "${{ steps.deploy_firestore.outcome }}" == "failure" ]; then
-            SUMMARY+="❌ Firestore Rules deployment FAILED\n"
+          # 2. Firestore Summary
+          if [ "$FIRESTORE_OUTCOME" == "success" ]; then
+            SUMMARY+="✅ Firestore Rules Updated\n"
+          elif [ "$FIRESTORE_OUTCOME" == "failure" ]; then
+            SUMMARY+="❌ Firestore Rules Deployment FAILED\n"
           fi
 
-          # 3. Storage Check
-          if [ "${{ steps.deploy_storage.outcome }}" == "success" ]; then
-            SUMMARY+="- Storage Rules updated\n"
-          elif [ "${{ steps.deploy_storage.outcome }}" == "failure" ]; then
-            SUMMARY+="❌ Storage Rules deployment FAILED\n"
+          # 3. Storage Summary
+          if [ "$STORAGE_OUTCOME" == "success" ]; then
+            SUMMARY+="✅ Storage Rules Updated\n"
+          elif [ "$STORAGE_OUTCOME" == "failure" ]; then
+            SUMMARY+="❌ Storage Rules Deployment FAILED\n"
           fi
 
-          # Fallback if nothing happened
+          # Fallback
           if [ -z "$SUMMARY" ]; then
             if [ "${{ job.status }}" == "success" ]; then
-               SUMMARY="- No changes detected. No deployments were necessary."
+               SUMMARY="No relevant changes detected. Deployment skipped."
             else
-               SUMMARY="- Workflow failed."
+               SUMMARY="❌ Workflow Failed (Pre-deploy error)"
             fi
           fi
 
