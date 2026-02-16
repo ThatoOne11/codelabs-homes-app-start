@@ -15,11 +15,13 @@ function mapImportsToFunctions(fileContent) {
       .map((name) => name.trim())
       .filter((name) => name.length > 0);
 
+    // FIX: Do not use path.dirname(). Use the import path as the specific prefix.
+    // e.g. "./features/cart" -> "features/cart"
+    // This ensures "features/cart.js" matches this, but "features/user.js" does not.
     const cleanPath = importPathRaw.replace(/^\.\//, "");
-    const directory = path.dirname(cleanPath);
 
     mappings.push({
-      dir: directory,
+      dir: cleanPath, // Use the full import path as the identifier
       functions: functionNames,
     });
   }
