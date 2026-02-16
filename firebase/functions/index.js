@@ -1,7 +1,9 @@
-const functions = require("firebase-functions");
-const logger = require("firebase-functions/logger");
+const { createUser, deleteUser } = require("./features/user");
+const { addToCart } = require("./features/cart");
 
-exports.helloWorld = functions.https.onRequest((request, response) => {
-  logger.info("Hello logs!", { structuredData: true });
-  response.send("Hello from Firebase!");
-});
+// Export them for Firebase
+module.exports = {
+  createUser,
+  deleteUser,
+  addToCart,
+};
